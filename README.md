@@ -64,7 +64,7 @@ you'd rather not enable debugging.
 | OK / Guide | Open the TV Guide |
 | Number keys | Tune directly to that channel |
 | Info | Show the channel banner |
-| Back | Close the guide |
+| Back | Close the guide; while watching, press twice to exit |
 | Settings / Red | Change the server address |
 
 ## Notes

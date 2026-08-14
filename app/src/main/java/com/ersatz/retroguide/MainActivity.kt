@@ -56,6 +56,14 @@ class MainActivity : AppCompatActivity() {
     /** True when the server was unreachable and OK should reopen setup. */
     private var awaitingSetup = false
 
+    /**
+     * BACK while watching used to exit straight to the launcher, which is very
+     * easy to hit by accident when you meant to leave the guide. Require two
+     * presses instead, the way most TV apps do.
+     */
+    private var backArmed = false
+    private val disarmBack = Runnable { backArmed = false }
+
     private fun openSetup() {
         startActivity(Intent(this, SetupActivity::class.java))
         finish()
@@ -118,6 +126,18 @@ class MainActivity : AppCompatActivity() {
         player = ExoPlayer.Builder(this).build().apply {
             playWhenReady = true
             repeatMode = Player.REPEAT_MODE_OFF
+            // Without this a stream that fails to open just shows black, with
+            // nothing on screen or in the log to say why.
+            addListener(object : Player.Listener {
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    val ch = channels.getOrNull(current)
+                    showBannerText(
+                        ch?.number ?: "",
+                        ch?.name ?: "CHANNEL",
+                        "NO SIGNAL — ${error.errorCodeName}"
+                    )
+                }
+            })
         }
         ui.fullPlayer.player = player
     }
@@ -279,11 +299,25 @@ class MainActivity : AppCompatActivity() {
                 channels.getOrNull(current)?.let { showBanner(it) }; return true
             }
             KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> { openSetup(); return true }
+            KeyEvent.KEYCODE_BACK -> {
+                // Second press within the window falls through to the system and exits.
+                if (backArmed) return super.onKeyDown(keyCode, event)
+                backArmed = true
+                showBannerText(
+                    channels.getOrNull(current)?.number ?: "",
+                    "PRESS BACK AGAIN TO EXIT", ""
+                )
+                handler.removeCallbacks(disarmBack)
+                handler.postDelayed(disarmBack, 3000)
+                return true
+            }
         }
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onBackPressed() {
+        // Reached only when BACK arrives outside the key path; the guide must
+        // still close rather than the app exiting underneath it.
         if (guideOpen) closeGuide() else super.onBackPressed()
     }
 
