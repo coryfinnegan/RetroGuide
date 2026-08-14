@@ -100,26 +100,67 @@ object Source {
     }
 
     /**
-     * Pull the guide. Parsed with regex rather than a pull parser on purpose:
-     * the file is one flat list of <programme> elements, and this keeps the whole
-     * app dependency-free apart from the player.
+     * Pull the guide with a streaming pull parser.
+     *
+     * This was originally a regex over the whole document, which worked on small
+     * guides and then fell off a cliff: a real lineup produced a 4.5 MB file with
+     * 10,259 programmes, and a lazy `(.*?)` under DOT_MATCHES_ALL rescans toward
+     * the end of the document from every position that fails to match. On a TV
+     * box that pinned the CPU at 127% and never finished. XmlPullParser is in the
+     * platform, reads straight from the socket, and is linear.
+     *
+     * Only a window around now is kept. The guide covers days; the UI shows the
+     * current programme and the next few half hours, and holding all 10k on a
+     * device with limited memory buys nothing.
      */
     fun loadGuide(): Map<String, List<Programme>> {
-        val text = fetch(xmltvUrl)
-        val rx = Regex(
-            """<programme start="([^"]+)"\s+stop="([^"]+)"\s+channel="([^"]+)"\s*>(.*?)</programme>""",
-            RegexOption.DOT_MATCHES_ALL
-        )
-        val titleRx = Regex("""<title[^>]*>(.*?)</title>""", RegexOption.DOT_MATCHES_ALL)
+        val now = System.currentTimeMillis()
+        val from = now - 3 * 3600_000L
+        val to = now + 12 * 3600_000L
+
+        val c = (URL(xmltvUrl).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 60000
+            setRequestProperty("User-Agent", "RetroGuide/1.0")
+        }
         val byChannel = HashMap<String, MutableList<Programme>>()
-        for (m in rx.findAll(text)) {
-            val title = titleRx.find(m.groupValues[4])?.groupValues?.get(1)
-                ?.replace("&amp;", "&")?.replace("&lt;", "<")?.replace("&gt;", ">")
-                ?.replace("&quot;", "\"")?.replace("&apos;", "'")?.trim() ?: continue
-            val ch = m.groupValues[3]
-            byChannel.getOrPut(ch) { mutableListOf() } += Programme(
-                ch, parseTime(m.groupValues[1]), parseTime(m.groupValues[2]), title
-            )
+        try {
+            val parser = android.util.Xml.newPullParser()
+            parser.setInput(c.inputStream, null)
+            var start = 0L
+            var stop = 0L
+            var channel: String? = null
+            var inProgramme = false
+            var title: String? = null
+
+            var event = parser.eventType
+            while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                when (event) {
+                    org.xmlpull.v1.XmlPullParser.START_TAG -> when (parser.name) {
+                        "programme" -> {
+                            inProgramme = true
+                            title = null
+                            start = parseTime(parser.getAttributeValue(null, "start") ?: "")
+                            stop = parseTime(parser.getAttributeValue(null, "stop") ?: "")
+                            channel = parser.getAttributeValue(null, "channel")
+                        }
+                        // take the first title only; XMLTV may repeat it per language
+                        "title" -> if (inProgramme && title == null) title = parser.nextText()
+                    }
+                    org.xmlpull.v1.XmlPullParser.END_TAG -> if (parser.name == "programme") {
+                        val ch = channel
+                        val t = title
+                        if (ch != null && !t.isNullOrBlank() && stop > from && start < to) {
+                            byChannel.getOrPut(ch) { mutableListOf() } +=
+                                Programme(ch, start, stop, t.trim())
+                        }
+                        inProgramme = false
+                    }
+                }
+                event = parser.next()
+            }
+        } finally {
+            c.disconnect()
         }
         byChannel.values.forEach { it.sortBy { p -> p.start } }
         return byChannel
