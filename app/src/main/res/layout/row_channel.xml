@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One channel row: number + name, then three half-hour programme cells. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_weight="2.2"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="10dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:id="@+id/chNo"
+            android:layout_width="46dp"
+            android:layout_height="wrap_content"
+            android:textColor="@color/guide_amber"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:gravity="end" />
+
+        <TextView
+            android:id="@+id/chName"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:textColor="@color/guide_white"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <TextView android:id="@+id/cell0" style="@style/GuideCell" />
+    <TextView android:id="@+id/cell1" style="@style/GuideCell" />
+    <TextView android:id="@+id/cell2" style="@style/GuideCell" />
+</LinearLayout>

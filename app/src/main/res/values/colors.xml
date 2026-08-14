@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The TV Guide channel's palette: deep indigo bed, amber headings,
+         white programme text, cyan for the selected row. -->
+    <color name="guide_top">#FF2A2A8C</color>
+    <color name="guide_bottom">#FF0A0A32</color>
+    <color name="guide_header">#FF141466</color>
+    <color name="guide_amber">#FFFFC020</color>
+    <color name="guide_white">#FFF2F2FF</color>
+    <color name="guide_cyan">#FF66E0FF</color>
+    <color name="guide_row_a">#33101055</color>
+    <color name="guide_row_b">#22202070</color>
+    <color name="guide_sel">#FF3A3AB0</color>
+    <color name="black">#FF000000</color>
+</resources>

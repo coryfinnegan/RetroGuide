@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Retro Guide</string>
+    <string name="channel_col">CHANNEL</string>
+
+    <string name="setup_title">RETRO GUIDE — SETUP</string>
+    <string name="setup_address">SERVER</string>
+    <string name="setup_hint">192.168.1.10:8409</string>
+    <string name="setup_connect">CONNECT</string>
+    <string name="setup_scan">SCAN AGAIN</string>
+    <string name="setup_scanning">Searching your network for ErsatzTV…</string>
+    <string name="setup_progress">Searching… %1$d of %2$d addresses</string>
+    <string name="setup_found">Found %1$d server(s). Choose one, or type an address below.</string>
+    <string name="setup_none">No server found automatically. Type the address of the machine running ErsatzTV.</string>
+    <string name="setup_enter_address">Enter an address first, e.g. 192.168.1.10:8409</string>
+    <string name="setup_checking">Checking %1$s…</string>
+    <string name="setup_no_server">No ErsatzTV at %1$s. Check the address and that the server is running.</string>
+</resources>

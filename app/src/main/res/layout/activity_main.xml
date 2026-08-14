@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The nineties TV Guide channel layout: a video window pinned top-left, the
+  current programme beside it, and the scrolling grid filling the bottom.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/guide_bg">
+
+    <!-- Fullscreen playback. The guide sits on top of it. -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/fullPlayer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:use_controller="false"
+        app:resize_mode="fit"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ============ CHANNEL BANNER (shown briefly on channel change) ============ -->
+    <LinearLayout
+        android:id="@+id/banner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/banner_bg"
+        android:padding="16dp"
+        android:layout_margin="40dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/bannerNumber"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/guide_amber"
+            android:textSize="46sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:minWidth="90dp"
+            android:gravity="center" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="18dp">
+
+            <TextView
+                android:id="@+id/bannerName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/guide_white"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/bannerNow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/guide_cyan"
+                android:textSize="18sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ============ GUIDE OVERLAY ============ -->
+    <FrameLayout
+        android:id="@+id/guideOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/guide_bg"
+        android:visibility="gone">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="24dp">
+
+            <!-- video window, top-left, exactly like the original -->
+            <FrameLayout
+                android:id="@+id/windowFrame"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:background="@drawable/window_border"
+                android:padding="4dp"
+                app:layout_constraintDimensionRatio="16:9"
+                app:layout_constraintWidth_percent="0.34"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent">
+
+                <androidx.media3.ui.PlayerView
+                    android:id="@+id/windowPlayer"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    app:use_controller="false"
+                    app:resize_mode="zoom" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/guide_amber"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <TextView
+                android:id="@+id/nowPlaying"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:textColor="@color/guide_white"
+                android:textSize="21sp"
+                android:fontFamily="monospace"
+                android:maxLines="4"
+                android:layout_marginStart="22dp"
+                app:layout_constraintTop_toTopOf="@id/windowFrame"
+                app:layout_constraintStart_toEndOf="@id/windowFrame"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- time column headers -->
+            <LinearLayout
+                android:id="@+id/timeHeader"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@color/guide_header"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:layout_marginTop="16dp"
+                app:layout_constraintTop_toBottomOf="@id/windowFrame"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="2.2"
+                    android:layout_height="wrap_content"
+                    android:text="@string/channel_col"
+                    android:textColor="@color/guide_amber"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="4dp" />
+
+                <TextView android:id="@+id/slot0" style="@style/SlotHeader" />
+                <TextView android:id="@+id/slot1" style="@style/SlotHeader" />
+                <TextView android:id="@+id/slot2" style="@style/SlotHeader" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/guideList"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:clipToPadding="false"
+                app:layout_constraintTop_toBottomOf="@id/timeHeader"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/guide_amber"
+        android:textSize="24sp"
+        android:fontFamily="monospace"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

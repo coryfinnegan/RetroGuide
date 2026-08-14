@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Machine-specific — must never be committed
+# ---------------------------------------------------------------------------
+# local.properties holds the absolute path to this machine's Android SDK, so
+# committing it breaks the build for everyone else.
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+build/
+app/build/
+.gradle/
+out/
+release/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# native build artefacts
+.cxx/
+.externalNativeBuild/
+
+# ---------------------------------------------------------------------------
+# IDE
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+.kotlin/
+captures/
+.navigation/
+
+# ---------------------------------------------------------------------------
+# OS
+# ---------------------------------------------------------------------------
+Thumbs.db
+Desktop.ini
+desktop.ini
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Deliberately NOT ignored
+# ---------------------------------------------------------------------------
+# The Gradle wrapper (gradlew, gradlew.bat, gradle/wrapper/*) is committed on
+# purpose — it is what lets someone clone and build without first installing a
+# matching Gradle version by hand.
+!gradle/wrapper/gradle-wrapper.jar
