@@ -74,6 +74,11 @@ class MainActivity : AppCompatActivity() {
         ui = ActivityMainBinding.inflate(layoutInflater)
         setContentView(ui.root)
 
+        // Watching TV involves no button presses, so the device counts it as
+        // idle and starts the screensaver over the picture. Nothing else here
+        // holds the screen awake; a player has to say so itself.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         ui.guideList.layoutManager = LinearLayoutManager(this)
 
         // No server configured yet - send the user to setup rather than failing.

@@ -74,5 +74,9 @@ The app talks to two standard endpoints — `/iptv/channels.m3u` and
 listens on all interfaces by default; if the TV can't reach it, check the
 firewall allows inbound TCP 8409.
 
+The app holds the screen awake while it is in the foreground, so the device's
+screensaver won't start over a programme you're watching. Since watching TV
+involves no button presses, Android would otherwise treat it as idle time.
+
 Debug builds are signed with the standard Android debug key, which is fine for
 sideloading but not for distribution.
