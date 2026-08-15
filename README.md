@@ -61,11 +61,13 @@ you'd rather not enable debugging.
 | Button | Action |
 |---|---|
 | Up / Down, Channel +/- | Change channel |
-| OK / Guide | Open the TV Guide |
+| Back / Guide | Open the TV Guide; press again to close it |
+| OK / Info | Show the channel banner |
 | Number keys | Tune directly to that channel |
-| Info | Show the channel banner |
-| Back | Close the guide; while watching, press twice to exit |
 | Settings / Red | Change the server address |
+
+The guide wraps around, so holding Down past the last channel returns to the
+first. Back never leaves the app — use Home to exit, as with any TV app.
 
 ## Notes
 

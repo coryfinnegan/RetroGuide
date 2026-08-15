@@ -56,14 +56,6 @@ class MainActivity : AppCompatActivity() {
     /** True when the server was unreachable and OK should reopen setup. */
     private var awaitingSetup = false
 
-    /**
-     * BACK while watching used to exit straight to the launcher, which is very
-     * easy to hit by accident when you meant to leave the guide. Require two
-     * presses instead, the way most TV apps do.
-     */
-    private var backArmed = false
-    private val disarmBack = Runnable { backArmed = false }
-
     private fun openSetup() {
         startActivity(Intent(this, SetupActivity::class.java))
         finish()
@@ -209,10 +201,7 @@ class MainActivity : AppCompatActivity() {
         ui.windowPlayer.player = player
         ui.guideOverlay.visibility = View.VISIBLE
         adapter?.notifyDataSetChanged()
-        ui.guideList.post {
-            ui.guideList.scrollToPosition(current)
-            ui.guideList.findViewHolderForAdapterPosition(current)?.itemView?.requestFocus()
-        }
+        focusGuideRow(current)
     }
 
     private fun closeGuide() {
@@ -247,26 +236,77 @@ class MainActivity : AppCompatActivity() {
                 val p = progs.fromSlot(s[i], s[i + 1])
                 h.cells[i].text = p?.title ?: "—"
             }
-            val onAir = position == current
-            h.root.setBackgroundColor(
-                ContextCompat.getColor(
-                    this@MainActivity,
-                    if (onAir) R.color.guide_sel
-                    else if (position % 2 == 0) R.color.guide_row_a else R.color.guide_row_b
-                )
-            )
             h.name.setTextColor(
                 ContextCompat.getColor(
                     this@MainActivity,
-                    if (onAir) R.color.guide_cyan else R.color.guide_white
+                    if (position == current) R.color.guide_cyan else R.color.guide_white
                 )
             )
             h.root.setOnClickListener { tune(position); closeGuide() }
+            // Rows are recycled, so repaint from the holder's live position
+            // rather than the position captured when this listener was made.
             h.root.setOnFocusChangeListener { v, has ->
-                v.alpha = if (has) 1f else 0.82f
-                if (has) v.setBackgroundColor(
-                    ContextCompat.getColor(this@MainActivity, R.color.guide_sel)
-                )
+                paintRow(v, h.bindingAdapterPosition, has)
+            }
+            paintRow(h.root, position, h.root.hasFocus())
+        }
+    }
+
+    /**
+     * Colour one guide row.
+     *
+     * Losing focus previously left the row painted as selected, so scrolling
+     * down the guide dragged a trail of highlighted rows behind it. Focus is
+     * the only thing that draws the bright background now; the tuned channel
+     * keeps a dimmer tint of its own plus the cyan name.
+     */
+    private fun paintRow(row: View, position: Int, focused: Boolean) {
+        row.alpha = if (focused) 1f else 0.82f
+        row.setBackgroundColor(
+            ContextCompat.getColor(
+                this, when {
+                    focused -> R.color.guide_sel
+                    position == current -> R.color.guide_onair
+                    position % 2 == 0 -> R.color.guide_row_a
+                    else -> R.color.guide_row_b
+                }
+            )
+        )
+    }
+
+    /**
+     * Wrap the guide cursor around at the ends of the list.
+     *
+     * Note this has to decide for itself whether we are at an edge. The
+     * activity sees DPAD keys *before* the framework runs its focus search, so
+     * consuming them unconditionally would replace normal row-to-row movement
+     * rather than extending it. Returning false leaves the press to the
+     * framework, which is the common case.
+     */
+    private fun wrapGuideFocus(delta: Int): Boolean {
+        val count = channels.size
+        if (count == 0) return false
+        val focused = ui.guideList.focusedChild ?: return false
+        val pos = ui.guideList.getChildAdapterPosition(focused)
+        if (pos == RecyclerView.NO_POSITION) return false
+        val atEdge = if (delta > 0) pos == count - 1 else pos == 0
+        if (!atEdge) return false
+        focusGuideRow(if (delta > 0) 0 else count - 1)
+        return true
+    }
+
+    /** Scroll a row into view and put the cursor on it once it exists. */
+    private fun focusGuideRow(position: Int) {
+        val lm = ui.guideList.layoutManager as LinearLayoutManager
+        lm.scrollToPositionWithOffset(position, 0)
+        // The holder is only created after the scroll's layout pass, and on a
+        // long jump not always by the first one.
+        ui.guideList.post {
+            val hit = ui.guideList.findViewHolderForAdapterPosition(position)
+            if (hit != null) hit.itemView.requestFocus()
+            else ui.guideList.post {
+                ui.guideList.findViewHolderForAdapterPosition(position)
+                    ?.itemView?.requestFocus()
             }
         }
     }
@@ -290,6 +330,9 @@ class MainActivity : AppCompatActivity() {
         if (guideOpen) {
             when (keyCode) {
                 KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_MENU -> { closeGuide(); return true }
+                // Only reached at the ends of the list - see wrapGuideFocus.
+                KeyEvent.KEYCODE_DPAD_DOWN -> return wrapGuideFocus(1)
+                KeyEvent.KEYCODE_DPAD_UP -> return wrapGuideFocus(-1)
                 // Settings from inside the guide, where there is room to advertise it.
                 KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> { openSetup(); return true }
             }
@@ -298,32 +341,22 @@ class MainActivity : AppCompatActivity() {
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { tune(current - 1); return true }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { tune(current + 1); return true }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_MENU -> { openGuide(); return true }
-            KeyEvent.KEYCODE_INFO -> {
+            // BACK opens the channel list, the way a cable box's guide button does.
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_GUIDE,
+            KeyEvent.KEYCODE_MENU -> { openGuide(); return true }
+            // OK is channel info, not the guide.
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_INFO -> {
                 channels.getOrNull(current)?.let { showBanner(it) }; return true
             }
             KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> { openSetup(); return true }
-            KeyEvent.KEYCODE_BACK -> {
-                // Second press within the window falls through to the system and exits.
-                if (backArmed) return super.onKeyDown(keyCode, event)
-                backArmed = true
-                showBannerText(
-                    channels.getOrNull(current)?.number ?: "",
-                    "PRESS BACK AGAIN TO EXIT", ""
-                )
-                handler.removeCallbacks(disarmBack)
-                handler.postDelayed(disarmBack, 3000)
-                return true
-            }
         }
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onBackPressed() {
-        // Reached only when BACK arrives outside the key path; the guide must
-        // still close rather than the app exiting underneath it.
-        if (guideOpen) closeGuide() else super.onBackPressed()
+        // Reached only when BACK arrives outside the key path. Mirror it there
+        // so the app never exits out from under a programme.
+        if (guideOpen) closeGuide() else openGuide()
     }
 
     override fun onStop() {

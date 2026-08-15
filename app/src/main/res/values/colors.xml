@@ -11,5 +11,8 @@
     <color name="guide_row_a">#33101055</color>
     <color name="guide_row_b">#22202070</color>
     <color name="guide_sel">#FF3A3AB0</color>
+    <!-- The channel currently tuned, when the cursor is elsewhere: readable as
+         "this is what's on" without competing with the focused row. -->
+    <color name="guide_onair">#66242499</color>
     <color name="black">#FF000000</color>
 </resources>
