@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MainScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+
+    <children>
+        <Video id="video" width="1920" height="1080" translation="[0,0]" />
+
+        <!-- Channel banner: number, name, and what is on now. -->
+        <Group id="banner" visible="false" translation="[80,820]">
+            <Rectangle id="bannerBg" width="1500" height="170" color="0x141466EE" />
+            <Rectangle width="1500" height="4" color="0xFFC020FF" />
+            <Rectangle width="1500" height="4" translation="[0,166]" color="0xFFC020FF" />
+            <Rectangle width="4" height="170" color="0xFFC020FF" />
+            <Rectangle width="4" height="170" translation="[1496,0]" color="0xFFC020FF" />
+            <Label id="bannerNumber" translation="[40,45]" width="120" horizAlign="right"
+                   color="0xFFC020FF" font="font:LargeBoldSystemFont" />
+            <Label id="bannerName" translation="[200,38]" width="1260"
+                   color="0xF2F2FFFF" font="font:LargeBoldSystemFont" />
+            <Label id="bannerNow" translation="[200,100]" width="1260"
+                   color="0x66E0FFFF" font="font:MediumSystemFont" />
+        </Group>
+
+        <!-- The guide overlay. Background bands are built in code. -->
+        <Group id="guide" visible="false">
+            <Group id="guideBg" />
+
+            <Rectangle id="windowFrame" translation="[50,45]" width="620" height="353"
+                       color="0xFFC020FF" />
+
+            <Label id="nowPlaying" wrap="true" translation="[710,55]" width="900" numLines="2"
+                   color="0xF2F2FFFF" font="font:LargeBoldSystemFont" />
+            <Label id="clock" translation="[1620,45]" width="250" horizAlign="right"
+                   color="0xFFC020FF" font="font:LargeBoldSystemFont" />
+
+            <Rectangle translation="[50,430]" width="1820" height="60" color="0x141466FF" />
+            <Label translation="[70,443]" text="CHANNEL" width="460"
+                   color="0xFFC020FF" font="font:MediumBoldSystemFont" />
+            <Label id="slot0" translation="[550,443]" width="430"
+                   color="0xFFC020FF" font="font:MediumBoldSystemFont" />
+            <Label id="slot1" translation="[995,443]" width="430"
+                   color="0xFFC020FF" font="font:MediumBoldSystemFont" />
+            <Label id="slot2" translation="[1440,443]" width="430"
+                   color="0xFFC020FF" font="font:MediumBoldSystemFont" />
+
+            <Group id="rows" translation="[50,496]" />
+        </Group>
+
+        <!-- First run / server moved. -->
+        <Group id="setup" visible="false">
+            <Rectangle width="1920" height="1080" color="0x0A0A32FF" />
+            <Label translation="[120,110]" text="RETRO GUIDE" color="0xFFC020FF"
+                   font="font:LargeBoldSystemFont" />
+            <Label id="setupStatus" wrap="true" translation="[120,190]" width="1680" numLines="2"
+                   color="0xF2F2FFFF" font="font:MediumSystemFont" />
+            <Group id="setupList" translation="[120,300]" />
+            <Label translation="[120,960]" width="1680" wrap="true" numLines="2" color="0x66E0FFFF"
+                   font="font:SmallSystemFont"
+                   text="Up/Down to choose, OK to select. The address is remembered, so this is a one time step." />
+        </Group>
+
+        <Label id="status" wrap="true" translation="[120,500]" width="1680" numLines="3"
+               color="0xF2F2FFFF" font="font:LargeBoldSystemFont" />
+    </children>
+</component>

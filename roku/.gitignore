@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+# The sideload zip is rebuilt by tools/package.py from what is committed here,
+# so there is no reason to track it.
+out/
+*.zip
+
+# ---------------------------------------------------------------------------
+# Machine-specific — must never be committed
+# ---------------------------------------------------------------------------
+# The Roku dev server password.
+.rokurc
+rokudev.properties
+
+# ---------------------------------------------------------------------------
+# Editor / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+Thumbs.db
+desktop.ini
+.DS_Store
