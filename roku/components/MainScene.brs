@@ -118,6 +118,10 @@ sub onLineup(event as Object)
 
     m.channels = res.channels
     m.guideData = res.guide
+    ? "[rg] channels="; m.channels.Count(); " guide keys="; m.guideData.Count()
+    if m.channels.Count() > 0
+        ? "[rg] first: #"; m.channels[0].number; " "; m.channels[0].name; " -> "; m.channels[0].url
+    end if
     m.status.visible = false
     m.awaitingSetup = false
 
@@ -176,11 +180,14 @@ sub startStream()
     content.url = ch.url
     content.streamformat = "hls"
     content.title = ch.name
+    ? "[rg] tune #"; ch.number; " "; ch.name; " -> "; ch.url
     m.video.content = content
     m.video.control = "play"
+    ? "[rg] video.control="; m.video.control; " visible="; m.video.visible; " w="; m.video.width
 end sub
 
 sub onVideoState(event as Object)
+    ? "[rg] video state="; event.getData(); " errCode="; m.video.errorCode; " errMsg="; m.video.errorMsg
     if event.getData() <> "error" then return
 
     ch = invalid
@@ -350,9 +357,11 @@ sub openGuide()
     end if
 
     ' Move the video into the corner window, exactly like the original channel.
+    ' Scale rather than resize: changing width/height on a playing Video node
+    ' moves the window but leaves the video plane blank, while a render scale
+    ' takes the picture with it. 610/1920 and 343/1080.
     m.video.translation = [55, 50]
-    m.video.width = 610
-    m.video.height = 343
+    m.video.scale = [0.3177, 0.3176]
     m.guide.visible = true
     paintRows()
 end sub
@@ -361,8 +370,7 @@ sub closeGuide()
     m.guideOpen = false
     m.guide.visible = false
     m.video.translation = [0, 0]
-    m.video.width = 1920
-    m.video.height = 1080
+    m.video.scale = [1.0, 1.0]
 end sub
 
 sub clampFirstRow()

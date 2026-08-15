@@ -3,23 +3,9 @@
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 
     <children>
-        <Video id="video" width="1920" height="1080" translation="[0,0]" />
-
-        <!-- Channel banner: number, name, and what is on now. -->
-        <Group id="banner" visible="false" translation="[80,820]">
-            <Rectangle id="bannerBg" width="1500" height="170" color="0x141466EE" />
-            <Rectangle width="1500" height="4" color="0xFFC020FF" />
-            <Rectangle width="1500" height="4" translation="[0,166]" color="0xFFC020FF" />
-            <Rectangle width="4" height="170" color="0xFFC020FF" />
-            <Rectangle width="4" height="170" translation="[1496,0]" color="0xFFC020FF" />
-            <Label id="bannerNumber" translation="[40,45]" width="120" horizAlign="right"
-                   color="0xFFC020FF" font="font:LargeBoldSystemFont" />
-            <Label id="bannerName" translation="[200,38]" width="1260"
-                   color="0xF2F2FFFF" font="font:LargeBoldSystemFont" />
-            <Label id="bannerNow" translation="[200,100]" width="1260"
-                   color="0x66E0FFFF" font="font:MediumSystemFont" />
-        </Group>
-
+        <!-- Order here is z-order. The guide is drawn first so the video can
+             sit on top of it as the corner window; the banner comes after the
+             video so it is legible over a full screen picture. -->
         <!-- The guide overlay. Background bands are built in code. -->
         <Group id="guide" visible="false">
             <Group id="guideBg" />
@@ -43,6 +29,25 @@
                    color="0xFFC020FF" font="font:MediumBoldSystemFont" />
 
             <Group id="rows" translation="[50,496]" />
+        </Group>
+
+        <!-- Sized full screen while watching, shrunk into the guide's
+             corner window when the guide opens. -->
+        <Video id="video" width="1920" height="1080" translation="[0,0]" />
+
+        <!-- Channel banner: number, name, and what is on now. -->
+        <Group id="banner" visible="false" translation="[80,820]">
+            <Rectangle id="bannerBg" width="1500" height="170" color="0x141466EE" />
+            <Rectangle width="1500" height="4" color="0xFFC020FF" />
+            <Rectangle width="1500" height="4" translation="[0,166]" color="0xFFC020FF" />
+            <Rectangle width="4" height="170" color="0xFFC020FF" />
+            <Rectangle width="4" height="170" translation="[1496,0]" color="0xFFC020FF" />
+            <Label id="bannerNumber" translation="[40,45]" width="120" horizAlign="right"
+                   color="0xFFC020FF" font="font:LargeBoldSystemFont" />
+            <Label id="bannerName" translation="[200,38]" width="1260"
+                   color="0xF2F2FFFF" font="font:LargeBoldSystemFont" />
+            <Label id="bannerNow" translation="[200,100]" width="1260"
+                   color="0x66E0FFFF" font="font:MediumSystemFont" />
         </Group>
 
         <!-- First run / server moved. -->

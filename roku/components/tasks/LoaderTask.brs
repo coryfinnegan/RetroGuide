@@ -16,7 +16,7 @@ sub run()
     ' raw MPEG-TS URLs, and .m3u8 for a channel just redirects back to the .ts;
     ' only this mode returns a real playlist (application/vnd.apple.mpegurl),
     ' which is the one thing Roku's video node will accept for live.
-    m3u = httpGet("http://" + host + "/iptv/channels.m3u?mode=hls-direct")
+    m3u = httpGet("http://" + host + "/iptv/channels.m3u")
     if m3u = invalid then
         out.error = "Cannot reach " + host
         m.top.result = out
@@ -67,7 +67,17 @@ function parseM3U(text as String) as Object
             mm = reName.Match(line)
             if mm.Count() > 1 then pending.name = mm[1].Trim()
         else if line <> "" and line.Left(1) <> "#" and pending <> invalid then
-            pending.url = line
+            ' Ask for the channel as segmented HLS. Roku will not play raw
+            ' MPEG-TS at all, and plain .m3u8 hands back a single segment as
+            ' long as the programme - which Roku accepts and then fails on with
+            ' a bare "unexpected problem" (error -3). mode=segmenter is the one
+            ' form that yields a normal live playlist of short segments, and it
+            ' needs no server side configuration.
+            if Right(line, 3) = ".ts" then
+                pending.url = Left(line, line.Len() - 3) + ".m3u8?mode=segmenter"
+            else
+                pending.url = line
+            end if
             if pending.number = "" then pending.number = StrI(out.Count() + 1).Trim()
             out.Push(pending)
             pending = invalid
