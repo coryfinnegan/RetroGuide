@@ -141,15 +141,18 @@ end sub
 
 ' ------------------------------------------------------------------ tuning
 
-sub tune(index as Integer)
+sub tune(index as Integer, announce = true as Boolean)
     if m.channels.Count() = 0 then return
     n = m.channels.Count()
     m.current = ((index mod n) + n) mod n
     ch = m.channels[m.current]
 
     writeRegistry("last_channel", ch.number)
-    showBanner(ch)
-    if m.guideOpen then paintRows()
+    if announce then showBanner(ch)
+    if m.guideOpen then
+        paintRows()
+        updateNowPlaying()
+    end if
 
     ' The banner follows the remote immediately; the stream waits until the
     ' viewer stops surfing. Also cancels a pending retry for the channel we are
@@ -170,6 +173,9 @@ end sub
 
 sub startStream()
     if m.channels.Count() = 0 then return
+    ' Cancel a settle that has not fired yet - otherwise closing the guide
+    ' restarts here and the pending timer restarts again a moment later.
+    m.tuneTimer.control = "stop"
     ch = m.channels[m.current]
 
     ' Drop the previous stream before asking for the next one, so the server
@@ -348,22 +354,25 @@ sub openGuide()
     end for
     updateClock()
 
-    if m.channels.Count() > 0 then
-        ch = m.channels[m.current]
-        p = nowOn(ch)
-        t = ""
-        if p <> invalid then t = p.title
-        m.nowPlaying.text = ch.number + "  " + ch.name + chr(10) + t
-    end if
+    updateNowPlaying()
 
     ' Move the video into the corner window, exactly like the original channel.
-    ' Scale rather than resize: changing width/height on a playing Video node
-    ' moves the window but leaves the video plane blank, while a render scale
-    ' takes the picture with it. 610/1920 and 343/1080.
     m.video.translation = [55, 50]
-    m.video.scale = [0.3177, 0.3176]
+    m.video.scale = [1.0, 1.0]
+    m.video.width = 610
+    m.video.height = 343
+    startStream()
     m.guide.visible = true
     paintRows()
+end sub
+
+sub updateNowPlaying()
+    if m.channels.Count() = 0 then return
+    ch = m.channels[m.current]
+    p = nowOn(ch)
+    t = ""
+    if p <> invalid then t = p.title
+    m.nowPlaying.text = ch.number + "  " + ch.name + chr(10) + t
 end sub
 
 sub closeGuide()
@@ -371,6 +380,9 @@ sub closeGuide()
     m.guide.visible = false
     m.video.translation = [0, 0]
     m.video.scale = [1.0, 1.0]
+    m.video.width = 1920
+    m.video.height = 1080
+    startStream()
 end sub
 
 sub clampFirstRow()
@@ -390,6 +402,10 @@ sub moveCursor(delta as Integer)
     if m.cursor > m.firstRow + m.VISIBLE_ROWS - 1 then m.firstRow = m.cursor - m.VISIBLE_ROWS + 1
     clampFirstRow()
     paintRows()
+    ' The corner window follows the highlighted channel, so browsing the guide
+    ' previews what you are about to pick. The settle delay means scrolling
+    ' quickly still only opens one stream.
+    tune(m.cursor, false)
 end sub
 
 sub paintRows()
@@ -588,7 +604,6 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         else if key = "down" then
             moveCursor(1)
         else if key = "OK" then
-            tune(m.cursor)
             closeGuide()
         else if key = "options" then
             openSetup()
