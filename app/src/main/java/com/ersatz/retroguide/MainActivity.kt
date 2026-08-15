@@ -56,6 +56,27 @@ class MainActivity : AppCompatActivity() {
     /** True when the server was unreachable and OK should reopen setup. */
     private var awaitingSetup = false
 
+    /** Opens the stream for whatever channel the viewer has settled on. */
+    private val openStream = Runnable { startStream() }
+    private var retries = 0
+
+    private companion object {
+        /**
+         * How long to let the channel number settle before opening a stream.
+         *
+         * ErsatzTV starts an ffmpeg process per request, so surfing with one
+         * request per keypress leaves a queue of them starting and tearing
+         * down at once, and a stream that has not begun emitting yet answers
+         * with bytes that are not a valid container. Waiting for the viewer to
+         * stop pressing means one request per channel actually landed on,
+         * which is also how a real cable box behaves - the banner moves at
+         * once, the picture follows.
+         */
+        const val TUNE_SETTLE_MS = 650L
+        const val RETRY_MS = 1200L
+        const val MAX_RETRIES = 2
+    }
+
     private fun openSetup() {
         startActivity(Intent(this, SetupActivity::class.java))
         finish()
@@ -128,11 +149,21 @@ class MainActivity : AppCompatActivity() {
             addListener(object : Player.Listener {
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     val ch = channels.getOrNull(current)
-                    showBannerText(
-                        ch?.number ?: "",
-                        ch?.name ?: "CHANNEL",
-                        "NO SIGNAL — ${error.errorCodeName}"
-                    )
+                    // These are nearly always transient - the server was still
+                    // bringing the stream up - so ask again before giving the
+                    // viewer an error to read.
+                    if (retries < MAX_RETRIES) {
+                        retries++
+                        showBannerText(ch?.number ?: "", ch?.name ?: "CHANNEL", "TUNING…")
+                        handler.removeCallbacks(openStream)
+                        handler.postDelayed(openStream, RETRY_MS)
+                    } else {
+                        showBannerText(
+                            ch?.number ?: "",
+                            ch?.name ?: "CHANNEL",
+                            "NO SIGNAL — ${error.errorCodeName}"
+                        )
+                    }
                 }
             })
         }
@@ -143,14 +174,28 @@ class MainActivity : AppCompatActivity() {
         if (channels.isEmpty()) return
         current = ((index % channels.size) + channels.size) % channels.size
         val ch = channels[current]
+        Prefs.setLastChannel(this, ch.number)
+        showBanner(ch)
+        adapter?.notifyDataSetChanged()
+        // The banner follows the remote immediately; the stream waits until
+        // the viewer stops surfing. Also cancels a pending retry for the
+        // channel we are leaving.
+        retries = 0
+        handler.removeCallbacks(openStream)
+        handler.postDelayed(openStream, TUNE_SETTLE_MS)
+    }
+
+    private fun startStream() {
+        val ch = channels.getOrNull(current) ?: return
         player?.apply {
+            // Drop the previous stream before asking for the next one, so the
+            // server can retire its ffmpeg rather than holding both open.
+            stop()
+            clearMediaItems()
             setMediaItem(MediaItem.fromUri(ch.url))
             prepare()
             play()
         }
-        Prefs.setLastChannel(this, ch.number)
-        showBanner(ch)
-        adapter?.notifyDataSetChanged()
     }
 
     private fun tuneToNumber(number: String) {

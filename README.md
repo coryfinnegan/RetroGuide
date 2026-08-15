@@ -76,6 +76,11 @@ The app talks to two standard endpoints — `/iptv/channels.m3u` and
 listens on all interfaces by default; if the TV can't reach it, check the
 firewall allows inbound TCP 8409.
 
+Channel changes settle for about half a second before the stream is opened, so
+surfing past ten channels asks the server for one stream rather than ten. The
+banner still moves with every press. A stream that fails to open is retried
+twice before the banner reports no signal.
+
 The app holds the screen awake while it is in the foreground, so the device's
 screensaver won't start over a programme you're watching. Since watching TV
 involves no button presses, Android would otherwise treat it as idle time.
