@@ -14,7 +14,7 @@ sub init()
     ' Waiting for the viewer to settle means one request per channel actually
     ' landed on - which is also how a real cable box behaves: the banner moves
     ' at once, the picture follows.
-    m.TUNE_SETTLE = 0.65
+    m.TUNE_SETTLE = 0.4
     m.RETRY_DELAY = 1.2
     m.MAX_RETRIES = 2
     m.BANNER_SECS = 4
@@ -188,13 +188,19 @@ sub startStream()
     content.streamformat = "hls"
     content.title = ch.name
     ? "[rg] tune #"; ch.number; " "; ch.name; " -> "; ch.url
+    m.tuneClock = CreateObject("roTimespan")
     m.video.content = content
     m.video.control = "play"
     ? "[rg] video.control="; m.video.control; " visible="; m.video.visible; " w="; m.video.width
 end sub
 
 sub onVideoState(event as Object)
-    ? "[rg] video state="; event.getData(); " errCode="; m.video.errorCode; " errMsg="; m.video.errorMsg
+    state = event.getData()
+    if state = "playing" and m.tuneClock <> invalid then
+        ? "[rg] PLAYING after "; m.tuneClock.TotalMilliseconds(); " ms"
+        m.tuneClock = invalid
+    end if
+    ? "[rg] video state="; state; " errCode="; m.video.errorCode; " errMsg="; m.video.errorMsg
     if event.getData() <> "error" then return
 
     ch = invalid
