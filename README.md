@@ -41,11 +41,13 @@ out.
 
 |  | Android | Roku |
 |---|---|---|
-| Stream format | MPEG-TS (`.ts`) | HLS (`?mode=hls-direct`) |
+| Stream format | MPEG-TS (`.ts`) | HLS (`?mode=segmenter`) |
 | Tune by number | Yes | No — no keypad on the remote |
 | Screensaver | Held off explicitly | Suppressed by the OS during playback |
+| Guide window | Shows the channel you're watching | Previews the highlighted channel |
 
-Roku won't play raw MPEG-TS, and ErsatzTV's per-channel `.m3u8` redirects back
-to the `.ts`, so the Roku build asks for the lineup with `mode=hls-direct` —
-the one mode that returns a real playlist. No server-side change is needed for
-either app.
+Roku won't play raw MPEG-TS, and ErsatzTV's per-channel `.m3u8` either redirects
+back to the `.ts` or, with `mode=hls-direct`, returns a single segment as long as
+the whole programme — which Roku accepts and then fails on. `mode=segmenter`
+returns an ordinary live playlist of short segments and plays. No server-side
+change is needed for either app.

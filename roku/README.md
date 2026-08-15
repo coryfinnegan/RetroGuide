@@ -67,12 +67,16 @@ and it is replaced by the next install.
 
 | Button | Action |
 |---|---|
-| Up / Down | Change channel |
-| Back | Open the TV Guide; press again to close it |
-| OK / Info (`*` on some remotes) | Show the channel banner |
+| Up / Down | Change channel — in the guide, preview the highlighted one |
+| Back | Open the guide — in the guide, leave it without changing channel |
+| OK | Show the channel banner — in the guide, switch to the highlighted channel |
 | Options (`*`) | Change the server address |
 
 Back never leaves the app — use Home to exit, as with any TV app.
+
+The guide's corner window previews whatever the cursor is on, so you can see a
+channel before committing to it. Only OK changes the channel; leaving with Back
+puts back whatever you were watching.
 
 ## Notes
 

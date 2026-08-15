@@ -49,6 +49,7 @@ sub init()
     m.setupCursor = 0
     m.setupHosts = []
     m.setupItems = []
+    m.channelBeforeGuide = 0
 
     buildGuideBackground()
     buildRows()
@@ -344,6 +345,9 @@ end sub
 
 sub openGuide()
     m.guideOpen = true
+    ' Browsing only previews. Leaving the guide with BACK puts this back on,
+    ' so the cursor cannot change the channel by accident - only OK commits.
+    m.channelBeforeGuide = m.current
     m.cursor = m.current
     m.firstRow = m.cursor - Int(m.VISIBLE_ROWS / 2)
     clampFirstRow()
@@ -364,6 +368,13 @@ sub openGuide()
     startStream()
     m.guide.visible = true
     paintRows()
+end sub
+
+' Undo the previewing done while browsing.
+sub abandonPreview()
+    if m.channelBeforeGuide = m.current then return
+    m.current = m.channelBeforeGuide
+    writeRegistry("last_channel", m.channels[m.current].number)
 end sub
 
 sub updateNowPlaying()
@@ -598,6 +609,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.guideOpen then
         if key = "back" then
+            abandonPreview()
             closeGuide()
         else if key = "up" then
             moveCursor(-1)
