@@ -9,7 +9,8 @@ sub init()
 end sub
 
 sub run()
-    PORT = 8409
+    ETV_PORT = 8409    ' note: not PORT - identifiers are case insensitive here, so it
+                       ' would be the same variable as the message port below
     BATCH = 32          ' concurrent requests; a streaming box is not a scanner
     WAIT_MS = 2500      ' generous for a LAN, and the whole sweep is 8 batches
 
@@ -20,7 +21,7 @@ sub run()
         return
     end if
 
-    port = CreateObject("roMessagePort")
+    msgPort = CreateObject("roMessagePort")
     host = 1
     while host <= 254
         live = {}
@@ -29,8 +30,8 @@ sub run()
         for i = host to upper
             ip = base + StrI(i).Trim()
             xfer = CreateObject("roUrlTransfer")
-            xfer.SetPort(port)
-            xfer.SetUrl("http://" + ip + ":" + StrI(PORT).Trim() + "/api/version")
+            xfer.SetPort(msgPort)
+            xfer.SetUrl("http://" + ip + ":" + StrI(ETV_PORT).Trim() + "/api/version")
             if xfer.AsyncGetToString() then
                 live[StrI(xfer.GetIdentity()).Trim()] = { ip: ip, xfer: xfer }
             end if
@@ -38,7 +39,7 @@ sub run()
 
         clock = CreateObject("roTimespan")
         while live.Count() > 0 and clock.TotalMilliseconds() < WAIT_MS
-            msg = wait(250, port)
+            msg = wait(250, msgPort)
             if type(msg) = "roUrlEvent" then
                 id = StrI(msg.GetSourceIdentity()).Trim()
                 entry = live[id]
@@ -46,7 +47,7 @@ sub run()
                     live.Delete(id)
                     ' Only ErsatzTV answers this path with a version string.
                     if msg.GetResponseCode() = 200 and Instr(1, msg.GetString(), "v") = 1 then
-                        found.Push(entry.ip + ":" + StrI(PORT).Trim())
+                        found.Push(entry.ip + ":" + StrI(ETV_PORT).Trim())
                     end if
                 end if
             end if
