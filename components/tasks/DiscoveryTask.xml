@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="DiscoveryTask" extends="Task">
+    <interface>
+        <field id="found" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/tasks/DiscoveryTask.brs" />
+</component>

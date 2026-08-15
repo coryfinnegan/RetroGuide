@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="LoaderTask" extends="Task">
+    <interface>
+        <field id="host" type="string" />
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/tasks/LoaderTask.brs" />
+</component>
