@@ -26,10 +26,15 @@ Both talk to the same two standard endpoints — `/iptv/channels.m3u` and
 
 - **Live TV** with channel surfing and a banner showing the channel number,
   name, and what's on now
-- **TV Guide overlay** — video window top-left, clock top-right, and a grid of
-  channels against three half-hour columns drawn from XMLTV, wrapping around at
-  both ends
-- **Resumes** the last channel watched, and refreshes the lineup on launch
+- **TV Guide overlay** — video window top-left showing what you are watching,
+  clock top-right, and a grid of channels against three half-hour columns drawn
+  from XMLTV, wrapping around at both ends. The cursor moves the highlight; OK
+  changes the channel
+- **Resumes** the last channel watched, and reads the lineup on launch. The
+  channel list is deliberately *not* re-read while the app runs — swapping
+  channels underneath someone watching is worse than a stale list — so a
+  channel added on the server appears at the next start, and the app says so
+  once with a fingerprint of the lineup rather than by diffing lists
 - **Settle before tuning** — surfing past ten channels asks the server for one
   stream rather than ten, since ErsatzTV starts an ffmpeg per request. The
   banner still moves with every press.
@@ -56,7 +61,6 @@ neither ends up committed.
 | Stream format | MPEG-TS (`.ts`) | HLS (`?mode=segmenter`) |
 | Tune by number | Yes | No — no keypad on the remote |
 | Screensaver | Held off explicitly | Suppressed by the OS during playback |
-| Guide window | Shows the channel you're watching | Previews the highlighted channel |
 
 Roku won't play raw MPEG-TS, and ErsatzTV's per-channel `.m3u8` either redirects
 back to the `.ts` or, with `mode=hls-direct`, returns a single segment as long as

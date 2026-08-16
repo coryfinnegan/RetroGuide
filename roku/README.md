@@ -67,16 +67,17 @@ and it is replaced by the next install.
 
 | Button | Action |
 |---|---|
-| Up / Down | Change channel — in the guide, preview the highlighted one |
+| Up / Down | Change channel — in the guide, move the highlight |
 | Back | Open the guide — in the guide, leave it without changing channel |
 | OK | Show the channel banner — in the guide, switch to the highlighted channel |
 | Options (`*`) | Change the server address |
 
 Back never leaves the app — use Home to exit, as with any TV app.
 
-The guide's corner window previews whatever the cursor is on, so you can see a
-channel before committing to it. Only OK changes the channel; leaving with Back
-puts back whatever you were watching.
+The guide's corner window shows the channel you are watching, and moving the
+cursor only moves the highlight — the same as the Android build. Previewing
+each highlighted channel meant restarting the stream on every keypress, which
+is too disruptive to watch around. Only OK changes the channel.
 
 ## Notes
 

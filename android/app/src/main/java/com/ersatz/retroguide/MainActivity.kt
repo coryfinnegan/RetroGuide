@@ -56,6 +56,9 @@ class MainActivity : AppCompatActivity() {
     /** True when the server was unreachable and OK should reopen setup. */
     private var awaitingSetup = false
 
+    /** Set at launch when the channel list differs from the last run. */
+    private var lineupChanged = false
+
     /** Opens the stream for whatever channel the viewer has settled on. */
     private val openStream = Runnable { startStream() }
     private var retries = 0
@@ -72,7 +75,7 @@ class MainActivity : AppCompatActivity() {
          * which is also how a real cable box behaves - the banner moves at
          * once, the picture follows.
          */
-        const val TUNE_SETTLE_MS = 650L
+        const val TUNE_SETTLE_MS = 400L
         const val RETRY_MS = 1200L
         const val MAX_RETRIES = 2
     }
@@ -123,6 +126,7 @@ class MainActivity : AppCompatActivity() {
                     return@onSuccess
                 }
                 ui.status.visibility = View.GONE
+                reportLineupChange(ch)
                 adapter = GuideAdapter().also { ui.guideList.adapter = it }
                 startPlayer()
                 val resume = Prefs.lastChannel(this@MainActivity)
@@ -138,6 +142,18 @@ class MainActivity : AppCompatActivity() {
                 awaitingSetup = true
             }
         }
+    }
+
+    /**
+     * Notice a lineup change once per launch, rather than diffing lists. The
+     * channel list is deliberately only read at startup - swapping channels
+     * underneath someone who is watching is worse than a stale list.
+     */
+    private fun reportLineupChange(channels: List<Channel>) {
+        val signature = Prefs.signatureOf(channels)
+        val previous = Prefs.lineupSignature(this)
+        lineupChanged = previous != null && previous != signature
+        Prefs.setLineupSignature(this, signature)
     }
 
     private fun startPlayer() {
@@ -208,6 +224,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun showBanner(ch: Channel) {
         val now = nowOn(ch)
+        // Say so once, on the first banner after the lineup changed.
+        if (lineupChanged) {
+            lineupChanged = false
+            showBannerText(ch.number, ch.name, "CHANNEL LIST UPDATED — ${channels.size} CHANNELS")
+            return
+        }
         showBannerText(ch.number, ch.name, now?.let {
             "${hhmm(it.start)}–${hhmm(it.stop)}  ${it.title}"
         } ?: "")

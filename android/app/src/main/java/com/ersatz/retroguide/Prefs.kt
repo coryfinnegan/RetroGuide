@@ -15,6 +15,7 @@ object Prefs {
     private const val FILE = "retroguide"
     private const val KEY_HOST = "host"
     private const val KEY_LAST_CHANNEL = "last_channel"
+    private const val KEY_LINEUP_SIG = "lineup_sig"
 
     private fun sp(c: Context): SharedPreferences =
         c.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -34,6 +35,27 @@ object Prefs {
 
     fun setLastChannel(c: Context, number: String) {
         sp(c).edit().putString(KEY_LAST_CHANNEL, number).apply()
+    }
+
+    /**
+     * A fingerprint of the lineup as of the last launch.
+     *
+     * The channel list is only read at startup — swapping channels underneath
+     * someone who is watching is worse than showing a stale list until the next
+     * launch — so this is how a change gets noticed, without diffing lists.
+     */
+    fun lineupSignature(c: Context): String? = sp(c).getString(KEY_LINEUP_SIG, null)
+
+    fun setLineupSignature(c: Context, signature: String) {
+        sp(c).edit().putString(KEY_LINEUP_SIG, signature).apply()
+    }
+
+    /** Numbers and names both count: a rename matters as much as an addition. */
+    fun signatureOf(channels: List<Channel>): String {
+        val joined = channels.joinToString("|") { "${it.number}:${it.name}" }
+        return java.security.MessageDigest.getInstance("MD5")
+            .digest(joined.toByteArray())
+            .joinToString("") { "%02X".format(it) }
     }
 
     /** Load any saved host into Source. Returns false when setup is still needed. */

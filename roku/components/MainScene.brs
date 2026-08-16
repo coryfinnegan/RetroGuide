@@ -49,7 +49,6 @@ sub init()
     m.setupCursor = 0
     m.setupHosts = []
     m.setupItems = []
-    m.channelBeforeGuide = 0
 
     buildGuideBackground()
     buildRows()
@@ -125,6 +124,7 @@ sub onLineup(event as Object)
     end if
     m.status.visible = false
     m.awaitingSetup = false
+    reportLineupChange()
 
     ' Resume whatever was on last time.
     last = readRegistry("last_channel")
@@ -138,6 +138,38 @@ sub onLineup(event as Object)
         end for
     end if
     tune(idx)
+end sub
+
+' A fingerprint of the lineup, so a change is trivial to spot without
+' comparing lists. Numbers and names both count, since a rename matters as
+' much as an addition. Checked once per launch: the lineup is only re-read
+' when the app starts, because swapping channels underneath someone who is
+' watching is worse than showing a stale list until the next restart.
+function lineupSignature() as String
+    parts = ""
+    for each ch in m.channels
+        parts = parts + ch.number + ":" + ch.name + "|"
+    end for
+    bytes = CreateObject("roByteArray")
+    bytes.FromAsciiString(parts)
+    digest = CreateObject("roEVPDigest")
+    digest.Setup("md5")
+    return digest.Process(bytes)
+end function
+
+sub reportLineupChange()
+    signature = lineupSignature()
+    previous = readRegistry("lineup_sig")
+    count = StrI(m.channels.Count()).Trim()
+    if previous = "" then
+        ? "[rg] lineup "; signature; " ("; count; " channels, first run)"
+    else if previous <> signature then
+        ? "[rg] lineup CHANGED "; previous; " -> "; signature; " ("; count; " channels)"
+        m.lineupChanged = true
+    else
+        ? "[rg] lineup unchanged ("; count; " channels)"
+    end if
+    writeRegistry("lineup_sig", signature)
 end sub
 
 ' ------------------------------------------------------------------ tuning
@@ -235,6 +267,11 @@ sub showBanner(ch as Object)
     line = ""
     p = nowOn(ch)
     if p <> invalid then line = hhmm(p.start) + "–" + hhmm(p.stop) + "  " + p.title
+    ' Say so once, on the first banner after the lineup changed.
+    if m.lineupChanged = true then
+        line = "CHANNEL LIST UPDATED - " + StrI(m.channels.Count()).Trim() + " CHANNELS"
+        m.lineupChanged = false
+    end if
     showBannerText(ch.number, ch.name, line)
 end sub
 
@@ -351,9 +388,6 @@ end sub
 
 sub openGuide()
     m.guideOpen = true
-    ' Browsing only previews. Leaving the guide with BACK puts this back on,
-    ' so the cursor cannot change the channel by accident - only OK commits.
-    m.channelBeforeGuide = m.current
     m.cursor = m.current
     m.firstRow = m.cursor - Int(m.VISIBLE_ROWS / 2)
     clampFirstRow()
@@ -374,13 +408,6 @@ sub openGuide()
     startStream()
     m.guide.visible = true
     paintRows()
-end sub
-
-' Undo the previewing done while browsing.
-sub abandonPreview()
-    if m.channelBeforeGuide = m.current then return
-    m.current = m.channelBeforeGuide
-    writeRegistry("last_channel", m.channels[m.current].number)
 end sub
 
 sub updateNowPlaying()
@@ -419,10 +446,6 @@ sub moveCursor(delta as Integer)
     if m.cursor > m.firstRow + m.VISIBLE_ROWS - 1 then m.firstRow = m.cursor - m.VISIBLE_ROWS + 1
     clampFirstRow()
     paintRows()
-    ' The corner window follows the highlighted channel, so browsing the guide
-    ' previews what you are about to pick. The settle delay means scrolling
-    ' quickly still only opens one stream.
-    tune(m.cursor, false)
 end sub
 
 sub paintRows()
@@ -615,13 +638,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.guideOpen then
         if key = "back" then
-            abandonPreview()
             closeGuide()
         else if key = "up" then
             moveCursor(-1)
         else if key = "down" then
             moveCursor(1)
         else if key = "OK" then
+            tune(m.cursor)
             closeGuide()
         else if key = "options" then
             openSetup()
