@@ -37,6 +37,18 @@ Both talk to the same two standard endpoints — `/iptv/channels.m3u` and
 Back opens the guide on both platforms and never exits the app; Home is the way
 out.
 
+## Working on this repo with Claude Code
+
+`.claude/skills/` carries a skill per platform — `retroguide-android` and
+`retroguide-roku` — covering the build and install loop, how to drive a real
+device, and the traps each platform has already sprung. They load automatically
+when Claude Code runs from this directory.
+
+The Roku skill includes `rokudev.py`, which packages, sideloads, launches, sends
+remote keys, takes screenshots and reads the BrightScript console. It takes the
+device address and dev password from `ROKU_IP` and `ROKU_DEV_PASSWORD` so
+neither ends up committed.
+
 ## Platform differences
 
 |  | Android | Roku |
