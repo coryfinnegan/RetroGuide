@@ -387,6 +387,7 @@ sub buildRows()
 end sub
 
 sub openGuide()
+    ? "[rg] guide OPEN"
     m.guideOpen = true
     m.cursor = m.current
     m.firstRow = m.cursor - Int(m.VISIBLE_ROWS / 2)
@@ -420,6 +421,7 @@ sub updateNowPlaying()
 end sub
 
 sub closeGuide()
+    ? "[rg] guide CLOSE"
     m.guideOpen = false
     m.guide.visible = false
     m.video.translation = [0, 0]
