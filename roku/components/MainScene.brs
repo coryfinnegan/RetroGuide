@@ -462,12 +462,7 @@ sub paintRows()
             ch = m.channels[idx]
             row.no.text = ch.number
             row.nm.text = ch.name
-            for c = 0 to 2
-                p = fromSlot(ch, s[c], s[c + 1])
-                t = "—"
-                if p <> invalid then t = p.title
-                row.cells[c].text = t
-            end for
+            paintCells(row, ch, s)
 
             ' Focus is the only thing that draws the bright background. The
             ' tuned channel keeps a dimmer tint of its own plus a cyan name, so
@@ -488,6 +483,52 @@ sub paintRows()
             end if
         end if
     end for
+end sub
+
+' Draw a row's three half-hour cells, merging any that hold the same
+' programme.
+'
+' Each column used to ask independently what was on at that half hour, so a
+' two hour film answered for all three and read as three separate half hour
+' programmes. Merging keeps the columns on clean half hours - the grid stays
+' scannable, and 91% of this lineup is short enough to occupy one column
+' anyway - while making length visible from the width of the block.
+sub paintCells(row as Object, ch as Object, s as Object)
+    found = []
+    for c = 0 to 2
+        found.Push(fromSlot(ch, s[c], s[c + 1]))
+    end for
+
+    c = 0
+    while c <= 2
+        p = found[c]
+
+        ' How many of the remaining columns hold this same programme?
+        span = 1
+        while c + span <= 2
+            q = found[c + span]
+            if p = invalid or q = invalid then exit while
+            if q.start <> p.start then exit while
+            span = span + 1
+        end while
+
+        cell = row.cells[c]
+        cell.visible = true
+        cell.width = 430 + 445 * (span - 1)
+        if p = invalid
+            cell.text = "—"
+        else
+            ' No "already under way" marker: the glyph is missing from the
+            ' system font, and it appeared on nearly every row anyway, which
+            ' works against the readability the merge is for.
+            cell.text = p.title
+        end if
+
+        for k = c + 1 to c + span - 1
+            row.cells[k].visible = false
+        end for
+        c = c + span
+    end while
 end sub
 
 sub onClockTimer()

@@ -29,7 +29,8 @@ Both talk to the same two standard endpoints — `/iptv/channels.m3u` and
 - **TV Guide overlay** — video window top-left showing what you are watching,
   clock top-right, and a grid of channels against three half-hour columns drawn
   from XMLTV, wrapping around at both ends. The cursor moves the highlight; OK
-  changes the channel
+  changes the channel. A programme covering more than one half hour is drawn as
+  a single block rather than repeated per column, so a film reads as a film
 - **Resumes** the last channel watched, and reads the lineup on launch. The
   channel list is deliberately *not* re-read while the app runs — swapping
   channels underneath someone watching is worse than a stale list — so a

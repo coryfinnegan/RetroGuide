@@ -78,6 +78,9 @@ class MainActivity : AppCompatActivity() {
         const val TUNE_SETTLE_MS = 400L
         const val RETRY_MS = 1200L
         const val MAX_RETRIES = 2
+
+        /** Matches @style/GuideCell; a merged cell takes this times its span. */
+        const val CELL_WEIGHT = 2f
     }
 
     private fun openSetup() {
@@ -293,16 +296,46 @@ class MainActivity : AppCompatActivity() {
 
         override fun getItemCount() = channels.size
 
+        /**
+         * Fill a row's three half-hour cells, merging any that hold the same
+         * programme.
+         *
+         * Each column used to ask independently what was on at that half hour,
+         * so a two hour film answered for all three and read as three separate
+         * half hour programmes. Merging keeps the columns on clean half hours -
+         * the grid stays scannable, and most of a lineup is short enough to
+         * occupy a single column anyway - while making length visible from the
+         * width of the block.
+         */
+        private fun paintCells(h: VH, progs: List<Programme>, s: List<Long>) {
+            val found = (0..2).map { progs.fromSlot(s[it], s[it + 1]) }
+            var i = 0
+            while (i <= 2) {
+                val p = found[i]
+                var span = 1
+                while (i + span <= 2) {
+                    val q = found[i + span]
+                    if (p == null || q == null || q.start != p.start) break
+                    span++
+                }
+                val cell = h.cells[i]
+                cell.visibility = View.VISIBLE
+                // A GONE view is left out of the weight sum, so the merged
+                // cell simply takes the share of every column it covers.
+                cell.layoutParams = (cell.layoutParams as LinearLayout.LayoutParams)
+                    .apply { weight = CELL_WEIGHT * span }
+                cell.text = p?.title ?: "—"
+                for (k in i + 1 until i + span) h.cells[k].visibility = View.GONE
+                i += span
+            }
+        }
+
         override fun onBindViewHolder(h: VH, position: Int) {
             val ch = channels[position]
             val s = slots()
             h.no.text = ch.number
             h.name.text = ch.name
-            val progs = ch.tvgId?.let { guide[it] } ?: emptyList()
-            for (i in 0..2) {
-                val p = progs.fromSlot(s[i], s[i + 1])
-                h.cells[i].text = p?.title ?: "—"
-            }
+            paintCells(h, ch.tvgId?.let { guide[it] } ?: emptyList(), s)
             h.name.setTextColor(
                 ContextCompat.getColor(
                     this@MainActivity,
