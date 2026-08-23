@@ -18,6 +18,13 @@ sub init()
     m.RETRY_DELAY = 1.2
     m.MAX_RETRIES = 2
     m.BANNER_SECS = 4
+    ' Roku terminates the channel on exit (no supports_suspend in the manifest),
+    ' so init runs fresh on every launch and nothing goes stale across a restart.
+    ' Being left running is the case that does: the guide covers a window around
+    ' the moment it was read, so after a few hours it has nothing to say. Only
+    ' the programme data is re-read - the channel list is deliberately left
+    ' alone until a restart, so it cannot change underneath someone watching.
+    m.GUIDE_REFRESH_SECS = 1800
     m.ROW_H = 128
     m.VISIBLE_ROWS = 4
 
@@ -42,6 +49,8 @@ sub init()
     m.current = 0
     m.guideOpen = false
     m.setupOpen = false
+    m.guideOnly = false
+    m.autoRestarts = 0
     m.awaitingSetup = false
     m.retries = 0
     m.cursor = 0        ' focused row in the guide
@@ -60,6 +69,7 @@ sub init()
     m.bannerTimer = newTimer(m.BANNER_SECS, false, "onBannerTimer")
     m.clockTimer = newTimer(30, true, "onClockTimer")
     m.clockTimer.control = "start"
+    m.guideTimer = newTimer(m.GUIDE_REFRESH_SECS, true, "onGuideTimer")
 
     m.top.setFocus(true)
 
@@ -105,8 +115,27 @@ sub loadLineup()
     m.loader.control = "RUN"
 end sub
 
+sub onGuideTimer()
+    m.guideOnly = true
+    loadLineup()
+end sub
+
 sub onLineup(event as Object)
     res = event.getData()
+
+    ' A periodic re-read: take the programme data and nothing else.
+    if m.guideOnly = true then
+        m.guideOnly = false
+        if res.guide <> invalid and res.guide.Count() > 0 then
+            m.guideData = res.guide
+            ? "[rg] guide refreshed ("; res.guide.Count(); " channels of listings)"
+            if m.guideOpen then
+                paintRows()
+                updateNowPlaying()
+            end if
+        end if
+        return
+    end if
     if res.error <> "" or res.channels.Count() = 0 then
         ' A server that has moved is the common case, so offer the fix rather
         ' than just reporting the failure.
@@ -124,6 +153,7 @@ sub onLineup(event as Object)
     end if
     m.status.visible = false
     m.awaitingSetup = false
+    m.guideTimer.control = "start"
     reportLineupChange()
 
     ' Resume whatever was on last time.
@@ -233,7 +263,19 @@ sub onVideoState(event as Object)
         m.tuneClock = invalid
     end if
     ? "[rg] video state="; state; " errCode="; m.video.errorCode; " errMsg="; m.video.errorMsg
-    if event.getData() <> "error" then return
+    if state = "playing" then m.autoRestarts = 0
+
+    ' A live channel has no end. Reaching one means the server retired the
+    ' session while we were watching, and without this the picture simply
+    ' stops and stays stopped.
+    if state = "finished" and m.autoRestarts < 3 then
+        m.autoRestarts = m.autoRestarts + 1
+        ? "[rg] stream ended on its own - reopening ("; m.autoRestarts; ")"
+        startStream()
+        return
+    end if
+
+    if state <> "error" then return
 
     ch = invalid
     if m.channels.Count() > 0 then ch = m.channels[m.current]
