@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retro Guide</title>
+<link rel="stylesheet" href="style.css">
+
+<div id="stage">
+  <video id="video" playsinline></video>
+
+  <!-- Everything readable lives inside the safe area; a CRT eats the edges. -->
+  <div id="safe">
+
+    <!-- VCR style on screen display -->
+    <div id="osd" class="hidden">
+      <div id="osdTop">
+        <span id="osdPlay">&#9654; PLAY</span>
+        <span id="osdClock">--:--</span>
+      </div>
+      <div id="osdMain">
+        <span id="osdNumber">--</span>
+        <span id="osdName"></span>
+      </div>
+      <div id="osdSub"></div>
+    </div>
+
+    <div id="guide" class="hidden">
+      <div id="guideHead">
+        <span id="guideTitle">CHANNEL</span>
+        <span id="slot0"></span><span id="slot1"></span><span id="slot2"></span>
+      </div>
+      <div id="rows"></div>
+      <div id="guideFoot"></div>
+    </div>
+
+    <div id="setup">
+      <h1>RETRO GUIDE</h1>
+      <p id="setupStatus">SEARCHING FOR ERSATZTV&hellip;</p>
+      <ul id="setupList"></ul>
+      <p class="hint">&#9650;&#9660; CHOOSE &nbsp; ENTER SELECT &nbsp; M TYPE ADDRESS</p>
+    </div>
+
+    <div id="overscan" class="hidden">
+      <p>OVERSCAN <span id="overscanValue"></span></p>
+      <p class="hint">&#9650;&#9660; ADJUST &nbsp; ENTER DONE</p>
+      <div id="overscanFrame"></div>
+    </div>
+
+    <div id="toast" class="hidden"></div>
+  </div>
+</div>
+
+<script src="vendor/hls.min.js"></script>
+<script src="app.js"></script>

@@ -10,8 +10,12 @@ Two apps, one design, one server.
 |---|---|---|
 | [**android/**](android) | Android TV / Google TV | Kotlin, Media3/ExoPlayer |
 | [**roku/**](roku) | Roku / Roku TV | BrightScript, SceneGraph |
+| [**crt/**](crt) | A CRT, fed from a PC | HTML/JS, hls.js, VCR styling |
 
-Each folder builds and installs independently — see the README inside it.
+Each folder builds and installs independently — see the README inside it. The
+CRT build is self-hosted rather than installed: `python crt/serve.py --open` on
+the machine wired to the tube. Its look is borrowed from
+[240-MP](https://github.com/anthonycaccese/240-MP).
 
 ## Shared behaviour
 
@@ -62,6 +66,10 @@ neither ends up committed.
 | Stream format | MPEG-TS (`.ts`) | HLS (`?mode=segmenter`) |
 | Tune by number | Yes | No — no keypad on the remote |
 | Screensaver | Held off explicitly | Suppressed by the OS during playback |
+
+The CRT build plays HLS like the Roku, tunes by number like the Android build
+since it has a keyboard, and adds an adjustable overscan no other platform
+needs.
 
 Roku won't play raw MPEG-TS, and ErsatzTV's per-channel `.m3u8` either redirects
 back to the `.ts` or, with `mode=hls-direct`, returns a single segment as long as

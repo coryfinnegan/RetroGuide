@@ -1,0 +1,201 @@
+/* Retro Guide, styled for a CRT.
+ *
+ * Laid out at 640x480 and scaled as a whole, so the proportions hold whether
+ * this ends up on a 480i tube over component or a modern panel over HDMI.
+ *
+ * CRT rules that shape everything here:
+ *   - nothing thinner than 2px: a 1px horizontal line sits on one field of an
+ *     interlaced frame and buzzes
+ *   - no thin or small type; the shadow mask cannot resolve it
+ *   - keep away from the edges, which are simply not shown - see --overscan
+ *   - flat blocks of colour rather than gradients, which band on composite
+ */
+:root {
+  --bg:      #0a0a0a;
+  --osd:     #f4f4f4;
+  --amber:   #ffb000;   /* VCR on screen display amber */
+  --cyan:    #56d8ff;   /* the channel you are on */
+  --panel:   #101038;
+  --row-a:   #16163f;
+  --row-b:   #0d0d2c;
+  --sel:     #2f2f8c;
+  --overscan: 5%;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  cursor: none;                     /* no mouse on a television */
+}
+
+#stage {
+  position: absolute;
+  width: 640px;
+  height: 480px;
+  transform-origin: top left;       /* JS sets scale and offset */
+  background: var(--bg);
+  color: var(--osd);
+  font-family: "VCR OSD Mono", "Consolas", "DejaVu Sans Mono", monospace;
+  font-size: 19px;
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+#video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  object-fit: contain;
+}
+
+#safe {
+  position: absolute;
+  inset: var(--overscan);
+}
+
+.hidden { display: none !important; }
+
+/* ------------------------------------------------------------------ OSD */
+
+#osd {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: rgba(4, 4, 20, 0.86);
+  border: 4px solid var(--amber);
+  padding: 10px 14px;
+}
+
+#osdTop {
+  display: flex;
+  justify-content: space-between;
+  color: var(--amber);
+  letter-spacing: 2px;
+}
+
+#osdMain {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+#osdNumber { color: var(--amber); font-size: 40px; }
+#osdName   { font-size: 26px; }
+
+#osdSub {
+  color: var(--cyan);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* blink like a VCR that never got its clock set */
+@keyframes blink { 50% { opacity: 0.15; } }
+#osdPlay { animation: blink 2s steps(1, end) infinite; }
+
+/* ---------------------------------------------------------------- guide */
+
+#guide {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #1a1a5e 0%, var(--bg) 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+#guideHead, .row {
+  display: grid;
+  grid-template-columns: 200px 1fr 1fr 1fr;
+  align-items: stretch;
+}
+
+#guideHead {
+  background: var(--panel);
+  color: var(--amber);
+  padding: 6px 8px;
+  border-bottom: 4px solid var(--amber);
+  letter-spacing: 1px;
+}
+
+/* The rows share whatever height is left after the header and footer, so the
+   last one is never half drawn - and overscan is adjustable, which changes
+   that height. */
+#rows {
+  flex: 1;
+  display: grid;
+  grid-auto-rows: 1fr;
+  overflow: hidden;
+}
+
+.row { border-bottom: 2px solid #000; }
+.row.a  { background: var(--row-a); }
+.row.b  { background: var(--row-b); }
+.row.on { background: #1d1d55; }          /* the channel currently playing */
+.row.cursor { background: var(--sel); }
+
+.chan { display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
+.num  { color: var(--amber); }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.on .name { color: var(--cyan); }
+
+/* A programme spanning more than one half hour is one cell, not repeated. */
+.cell {
+  padding: 6px 8px;
+  border-left: 2px solid #000;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  /* Fixed line box and a matching cap, so a long title is cut between lines
+     rather than through the middle of one - half a row of letters reads as
+     a fault on a CRT, where everything is already soft. */
+  font-size: 16px;
+  line-height: 22px;   /* comfortably taller than the glyphs, so descenders
+                          are never sliced by the cap below */
+  height: 44px;        /* exactly two line boxes */
+}
+
+#guideFoot {
+  background: var(--panel);
+  color: var(--amber);
+  padding: 4px 8px;
+  border-top: 4px solid var(--amber);
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+/* ------------------------------------------------- setup and overscan */
+
+#setup, #overscan {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  padding: 22px;
+}
+
+h1 { color: var(--amber); font-size: 30px; letter-spacing: 4px; margin-bottom: 12px; }
+#setupStatus { margin-bottom: 14px; }
+#setupList { list-style: none; }
+#setupList li { padding: 8px 10px; background: var(--row-b); margin-bottom: 6px; }
+#setupList li.cursor { background: var(--sel); }
+.hint { color: var(--cyan); font-size: 15px; margin-top: 16px; }
+
+#overscanFrame {
+  position: absolute;
+  inset: 12px;
+  border: 4px solid var(--amber);
+}
+
+#toast {
+  position: absolute;
+  top: 0; left: 0;
+  background: rgba(4, 4, 20, 0.9);
+  border: 4px solid var(--cyan);
+  padding: 8px 12px;
+}
