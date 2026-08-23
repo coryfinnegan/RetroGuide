@@ -1,0 +1,13 @@
+# docker compose up -d
+services:
+  retroguide-crt:
+    image: ghcr.io/coryfinnegan/retroguide-crt:latest
+    container_name: retroguide-crt
+    restart: unless-stopped
+    # Host networking so the server's LAN sweep sees the real network. On a
+    # bridge it would scan Docker's own subnet and find nothing. Linux and
+    # Raspberry Pi OS only; on Docker Desktop use the ports mapping below and
+    # type the ErsatzTV address by hand instead of discovering it.
+    network_mode: host
+    # ports:
+    #   - "8464:8464"

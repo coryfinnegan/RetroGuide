@@ -29,6 +29,77 @@ launch this:
 http://localhost:8464/?host=192.168.1.200:8409
 ```
 
+## Docker
+
+The image is the page and its little server — **not** the browser. The browser
+stays on the machine wired to the tube, because that is the thing that has to
+reach the display, and getting a container to draw on a Pi's screen is far more
+trouble than it is worth.
+
+```bash
+docker run -d --name retroguide-crt --network host --restart unless-stopped   ghcr.io/coryfinnegan/retroguide-crt:latest
+```
+
+or `docker compose up -d` with the compose file here.
+
+**Use `--network host`.** The LAN sweep only works if the container is on the
+real network; on a bridge it scans Docker's own subnet and finds nothing. If
+you must use a bridge — Docker Desktop on Windows or macOS — map `-p 8464:8464`
+and type the ErsatzTV address by hand instead of discovering it.
+
+### Publishing it
+
+`.github/workflows/crt-image.yml` builds for amd64, arm64 and arm/v7 and pushes
+to this repository's own registry. It is manual on purpose: run it from the
+**Actions** tab, or push a `v*` tag. `GITHUB_TOKEN` already has the rights, so
+there is no secret to set up.
+
+**The first publish is private.** Make it public once, at
+`https://github.com/users/<you>/packages`, and the Pi can then pull without
+logging in at all.
+
+To push from this PC instead of a runner:
+
+```bash
+echo $TOKEN | docker login ghcr.io -u <you> --password-stdin   # PAT, write:packages
+docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7   -t ghcr.io/<you>/retroguide-crt:latest --push crt/
+```
+
+Building arm on an x86 PC works through QEMU, which is slow — a few minutes.
+The runner does the same thing without tying up this machine.
+
+### The kiosk half, on the Pi
+
+The container serves; Chromium displays. On Raspberry Pi OS:
+
+```bash
+sudo apt install -y chromium-browser
+chromium-browser --kiosk --autoplay-policy=no-user-gesture-required   "http://localhost:8464/?host=192.168.1.200:8409"
+```
+
+To have it come up on boot, as a user service (`~/.config/systemd/user/retroguide.service`):
+
+```ini
+[Unit]
+Description=Retro Guide kiosk
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs --disable-infobars   --autoplay-policy=no-user-gesture-required   "http://localhost:8464/?host=192.168.1.200:8409"
+Restart=always
+
+[Install]
+WantedBy=graphical-session.target
+```
+
+`systemctl --user enable --now retroguide`. Pinning `?host=` matters here: a
+fresh browser profile has nothing saved and would otherwise stop at setup with
+no keyboard attached.
+
+A Pi 4 or 5 decodes 1080p H.264 in hardware and will be comfortable. Older
+boards will struggle with 1080p — worth pointing the ffmpeg profile at 720p if
+so, which is an ErsatzTV setting rather than anything here.
+
 ## Controls
 
 | Key | Action |
