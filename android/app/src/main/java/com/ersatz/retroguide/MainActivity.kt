@@ -59,6 +59,10 @@ class MainActivity : AppCompatActivity() {
     /** Set at launch when the channel list differs from the last run. */
     private var lineupChanged = false
 
+    /** onStart fires straight after onCreate; the first one has nothing to do. */
+    private var started = false
+    private var leftAt = 0L
+
     /** Opens the stream for whatever channel the viewer has settled on. */
     private val openStream = Runnable { startStream() }
     private var retries = 0
@@ -78,6 +82,12 @@ class MainActivity : AppCompatActivity() {
         const val TUNE_SETTLE_MS = 400L
         const val RETRY_MS = 1200L
         const val MAX_RETRIES = 2
+
+        /**
+         * Away longer than this and the lineup and guide are re-read on return.
+         * Shorter than this only the stream is reopened.
+         */
+        const val STALE_AFTER_MS = 5 * 60_000L
 
         /** Matches @style/GuideCell; a merged cell takes this times its span. */
         const val CELL_WEIGHT = 2f
@@ -459,8 +469,62 @@ class MainActivity : AppCompatActivity() {
         if (guideOpen) closeGuide() else openGuide()
     }
 
+    /**
+     * Android keeps the activity alive when the app is "closed", so onCreate
+     * does not run again on reopening. Without this the player sat on a stream
+     * the server retired hours ago - a frozen frame - and the guide still held
+     * programmes for a window that had long since passed, which is why it read
+     * as empty while changing channel worked fine.
+     */
+    override fun onStart() {
+        super.onStart()
+        if (!started) {
+            started = true
+            return
+        }
+        if (channels.isEmpty()) {
+            load()
+        } else if (System.currentTimeMillis() - leftAt > STALE_AFTER_MS) {
+            refreshOnReturn()
+        } else {
+            startStream()
+        }
+    }
+
+    /** Re-read the lineup and guide, then reopen the stream. */
+    private fun refreshOnReturn() {
+        val playing = channels.getOrNull(current)?.number
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val ch = Source.loadChannels()
+                    val g = runCatching { Source.loadGuide() }.getOrDefault(emptyMap())
+                    ch to g
+                }
+            }
+            result.onSuccess { (ch, g) ->
+                if (ch.isNotEmpty()) {
+                    channels = ch
+                    guide = g
+                    // Follow the channel by number: its index moves when
+                    // channels are added above it.
+                    playing?.let { n -> ch.indexOfFirst { it.number == n } }
+                        ?.takeIf { it >= 0 }
+                        ?.let { current = it }
+                    reportLineupChange(ch)
+                    adapter?.notifyDataSetChanged()
+                }
+                startStream()
+            }.onFailure {
+                // Whatever went wrong, at least get the picture back.
+                startStream()
+            }
+        }
+    }
+
     override fun onStop() {
         super.onStop()
+        leftAt = System.currentTimeMillis()
         player?.pause()
     }
 
