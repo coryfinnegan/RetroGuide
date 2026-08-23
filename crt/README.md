@@ -54,9 +54,22 @@ to this repository's own registry. It is manual on purpose: run it from the
 **Actions** tab, or push a `v*` tag. `GITHUB_TOKEN` already has the rights, so
 there is no secret to set up.
 
-**The first publish is private.** Make it public once, at
-`https://github.com/users/<you>/packages`, and the Pi can then pull without
-logging in at all.
+**The package does not exist until something publishes to it** — there is
+nothing to create beforehand. Run the workflow and it appears.
+
+Published from this public repo it came out public already, so the Pi pulls
+without logging in and no visibility step was needed. Worth checking rather
+than assuming, since a bare manifest request answers 401 even for a public
+image — every pull needs a token, and for a public one anybody can get it:
+
+```bash
+IMG=coryfinnegan/retroguide-crt
+TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:$IMG:pull&service=ghcr.io" | jq -r .token)
+curl -s -H "Authorization: Bearer $TOKEN" "https://ghcr.io/v2/$IMG/manifests/latest" | head
+```
+
+If it ever does come out private, the visibility switch is on the package page
+under **Packages** on your profile.
 
 To push from this PC instead of a runner:
 
