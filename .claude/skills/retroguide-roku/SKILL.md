@@ -62,6 +62,9 @@ playing. Trust `[rg] PLAYING` over a screenshot for the preview specifically.
 - **Escape `&` in XML** — an unescaped one makes the whole component fail to
   parse.
 - **Network work belongs in a `Task` node**, never the render thread.
+- **Sort channel numbers with `ToFloat`, not `ToInt`.** Sub-channel numbers like
+  `23.1` are how a multiplex sits beside its parent; `ToInt` collapses them all
+  to 23 and their order becomes whatever the M3U happened to list.
 
 ## Video, the part worth knowing
 
@@ -87,10 +90,11 @@ playing. Trust `[rg] PLAYING` over a screenshot for the preview specifically.
 
 ## Guide behaviour
 
-Browsing the guide previews the highlighted channel in the corner window;
-**only OK commits**, and BACK restores whatever was playing when the guide
-opened. This differs from the Android build, where the window keeps showing the
-channel you are watching.
+The corner window shows the channel being watched, and moving the cursor only
+moves the highlight - the same as the Android build. Previewing each highlighted
+channel was built and then removed: a Video node only survives a resize while
+stopped, so every cursor move restarted the stream, which is too disruptive to
+watch around. Only OK changes the channel.
 
 ## Packaging
 

@@ -88,6 +88,21 @@ TV, and blind channel-surfing tests have landed on horror.
   and one that has not begun emitting answers with bytes ExoPlayer cannot
   sniff (`ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED`) on a channel that is fine.
   The banner moves immediately; the stream waits ~400-650ms.
+- **Never rebind a focused list on a timer.** The clock tick called
+  `notifyDataSetChanged()` on the guide every 30 seconds, which rebinds every
+  row and takes focus off whatever the cursor was on. To the viewer the d-pad
+  simply stopped working, and the next press jumped to the top of the list -
+  a bug that only shows up if you sit in the guide for half a minute, which no
+  quick test does. Rebind only when the content actually changed (here, when
+  the half hour rolls over) and put focus back afterwards.
+- **`KEYCODE_SETTINGS` never reaches the app.** Google TV opens its own system
+  panel over the top. `KEYCODE_MENU` does arrive, and is free once BACK opens
+  the guide.
+- **Parse channel numbers as float, not int.** A multiplex uses sub-channel
+  numbers like `23.1`, and `toIntOrNull()` returns null for those - they all
+  landed in the `Int.MAX_VALUE` bucket at the bottom of the list, nowhere near
+  the channel they belong to. Leave room in the number column for four
+  characters too.
 - **Register a `Player.Listener`.** Without one a failed open is a silent black
   screen with nothing in the log.
 
