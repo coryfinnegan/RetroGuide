@@ -35,6 +35,8 @@ class MainActivity : AppCompatActivity() {
     private var guide: Map<String, List<Programme>> = emptyMap()
     private var current = 0
     private var guideOpen = false
+    private var settingsOpen = false
+    private var settingsCursor = 0
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideBanner = Runnable { ui.banner.visibility = View.GONE }
@@ -43,12 +45,29 @@ class MainActivity : AppCompatActivity() {
     private val typed = StringBuilder()
     private val commitTyped = Runnable { tuneToNumber(typed.toString()); typed.clear() }
 
+    /** The half-hour the guide columns were last drawn for. */
+    private var paintedSlot = 0L
+
     private val tick = object : Runnable {
         override fun run() {
             ui.clock.text = SimpleDateFormat("h:mm a", Locale.US).format(Date())
-            if (guideOpen) adapter?.notifyDataSetChanged()
+            // Rebinding the rows takes focus off whatever row the cursor is on,
+            // and doing that every 30 seconds made the guide look like it had
+            // stopped scrolling - the next press would start again from the top.
+            // The cells only change when the half hour rolls over, so only then.
+            if (guideOpen && slots()[0] != paintedSlot) refreshGuideRows()
             handler.postDelayed(this, 30_000)
         }
+    }
+
+    /** Redraw the rows, putting the cursor back where the viewer left it. */
+    private fun refreshGuideRows() {
+        paintedSlot = slots()[0]
+        val focused = ui.guideList.focusedChild
+            ?.let { ui.guideList.getChildAdapterPosition(it) }
+            ?.takeIf { it != RecyclerView.NO_POSITION }
+        adapter?.notifyDataSetChanged()
+        focused?.let { focusGuideRow(it) }
     }
 
     private var adapter: GuideAdapter? = null
@@ -91,6 +110,59 @@ class MainActivity : AppCompatActivity() {
 
         /** Matches @style/GuideCell; a merged cell takes this times its span. */
         const val CELL_WEIGHT = 2f
+    }
+
+    // ------------------------------------------------------------ settings
+
+    private val settingsRows by lazy {
+        listOf(ui.settingServer, ui.settingRestart, ui.settingClose, ui.settingBack)
+    }
+    private val settingsLabels = listOf(
+        "CHANGE SERVER ADDRESS", "RESTART APP", "CLOSE APP", "BACK TO TV"
+    )
+
+    private fun openSettings() {
+        settingsOpen = true
+        settingsCursor = 0
+        ui.settingsOverlay.visibility = View.VISIBLE
+        ui.banner.visibility = View.GONE
+        paintSettings()
+    }
+
+    private fun closeSettings() {
+        settingsOpen = false
+        ui.settingsOverlay.visibility = View.GONE
+    }
+
+    private fun paintSettings() {
+        settingsRows.forEachIndexed { i, row ->
+            row.text = settingsLabels[i]
+            row.setBackgroundColor(
+                ContextCompat.getColor(
+                    this, if (i == settingsCursor) R.color.guide_sel else R.color.guide_row_b
+                )
+            )
+            row.setTextColor(
+                ContextCompat.getColor(
+                    this, if (i == settingsCursor) R.color.guide_cyan else R.color.guide_white
+                )
+            )
+        }
+    }
+
+    private fun chooseSetting() {
+        when (settingsCursor) {
+            0 -> openSetup()
+            1 -> {
+                // A fresh process is the quickest cure for a wedged stream.
+                val intent = packageManager.getLaunchIntentForPackage(packageName)
+                intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                finishAffinity()
+                startActivity(intent)
+            }
+            2 -> finishAffinity()
+            else -> closeSettings()
+        }
     }
 
     private fun openSetup() {
@@ -281,6 +353,7 @@ class MainActivity : AppCompatActivity() {
         ui.windowPlayer.player = player
         ui.guideOverlay.visibility = View.VISIBLE
         adapter?.notifyDataSetChanged()
+        paintedSlot = slots()[0]
         focusGuideRow(current)
     }
 
@@ -396,9 +469,15 @@ class MainActivity : AppCompatActivity() {
     private fun wrapGuideFocus(delta: Int): Boolean {
         val count = channels.size
         if (count == 0) return false
-        val focused = ui.guideList.focusedChild ?: return false
-        val pos = ui.guideList.getChildAdapterPosition(focused)
-        if (pos == RecyclerView.NO_POSITION) return false
+        val focused = ui.guideList.focusedChild
+        val pos = focused?.let { ui.guideList.getChildAdapterPosition(it) }
+            ?: RecyclerView.NO_POSITION
+        if (pos == RecyclerView.NO_POSITION) {
+            // Nothing focused: recover to the channel being watched instead of
+            // leaving the d-pad dead.
+            focusGuideRow(current)
+            return true
+        }
         val atEdge = if (delta > 0) pos == count - 1 else pos == 0
         if (!atEdge) return false
         focusGuideRow(if (delta > 0) 0 else count - 1)
@@ -437,14 +516,34 @@ class MainActivity : AppCompatActivity() {
                 openSetup(); return true
             }
         }
+        if (settingsOpen) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    settingsCursor = (settingsCursor - 1 + settingsRows.size) % settingsRows.size
+                    paintSettings()
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    settingsCursor = (settingsCursor + 1) % settingsRows.size
+                    paintSettings()
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> chooseSetting()
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_SETTINGS,
+                KeyEvent.KEYCODE_PROG_RED -> closeSettings()
+            }
+            return true
+        }
+
         if (guideOpen) {
             when (keyCode) {
-                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_MENU -> { closeGuide(); return true }
+                KeyEvent.KEYCODE_BACK -> { closeGuide(); return true }
+                KeyEvent.KEYCODE_MENU -> { closeGuide(); openSettings(); return true }
                 // Only reached at the ends of the list - see wrapGuideFocus.
                 KeyEvent.KEYCODE_DPAD_DOWN -> return wrapGuideFocus(1)
                 KeyEvent.KEYCODE_DPAD_UP -> return wrapGuideFocus(-1)
                 // Settings from inside the guide, where there is room to advertise it.
-                KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> { openSetup(); return true }
+                KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> {
+                    closeGuide(); openSettings(); return true
+                }
             }
             return super.onKeyDown(keyCode, event)
         }
@@ -452,13 +551,15 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { tune(current - 1); return true }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { tune(current + 1); return true }
             // BACK opens the channel list, the way a cable box's guide button does.
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_GUIDE,
-            KeyEvent.KEYCODE_MENU -> { openGuide(); return true }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_GUIDE -> { openGuide(); return true }
+            // MENU, not SETTINGS: Google TV swallows KEYCODE_SETTINGS for its
+            // own panel, so the app never sees it.
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS,
+            KeyEvent.KEYCODE_PROG_RED -> { openSettings(); return true }
             // OK is channel info, not the guide.
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_INFO -> {
                 channels.getOrNull(current)?.let { showBanner(it) }; return true
             }
-            KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> { openSetup(); return true }
         }
         return super.onKeyDown(keyCode, event)
     }

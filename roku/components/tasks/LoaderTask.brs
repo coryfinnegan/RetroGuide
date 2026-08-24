@@ -84,12 +84,14 @@ function parseM3U(text as String) as Object
         end if
     end for
 
-    ' Sort by channel number, numerically - "10" must not land next to "1".
+    ' Sort by channel number, numerically - "10" must not land next to "1",
+    ' and ToFloat rather than ToInt so a sub-channel like "23.1" sorts just
+    ' after 23 instead of tying with it.
     for i = 1 to out.Count() - 1
         item = out[i]
-        key = item.number.ToInt()
+        key = item.number.ToFloat()
         j = i - 1
-        while j >= 0 and out[j].number.ToInt() > key
+        while j >= 0 and out[j].number.ToFloat() > key
             out[j + 1] = out[j]
             j = j - 1
         end while

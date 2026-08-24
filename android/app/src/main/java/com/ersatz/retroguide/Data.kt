@@ -86,7 +86,10 @@ object Source {
                 }
             }
         }
-        return out.sortedBy { it.number.toIntOrNull() ?: Int.MAX_VALUE }
+        // Sub-channel numbers like "23.1" are how a multiplex sits next to its
+        // parent. toIntOrNull returns null for those, which sent every one of
+        // them to the bottom of the list, away from the channel it belongs to.
+        return out.sortedBy { it.number.toFloatOrNull() ?: Float.MAX_VALUE }
     }
 
     // XMLTV times look like "20260810143000 -0500"

@@ -70,7 +70,10 @@ async function loadLineup() {
       pending = null;
     }
   }
-  list.sort((a, b) => (parseInt(a.number, 10) || 1e9) - (parseInt(b.number, 10) || 1e9));
+  // parseFloat, not parseInt: "23.1" is a sub-channel of 23 and belongs
+  // directly after it, not merged with it.
+  const num = (c) => { const n = parseFloat(c.number); return isNaN(n) ? 1e9 : n; };
+  list.sort((a, b) => num(a) - num(b));
   return list;
 }
 

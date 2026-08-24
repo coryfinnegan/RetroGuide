@@ -21,7 +21,8 @@
 
         <TextView
             android:id="@+id/chNo"
-            android:layout_width="46dp"
+            android:layout_width="72dp"
+            android:maxLines="1"
             android:layout_height="wrap_content"
             android:textColor="@color/guide_amber"
             android:textSize="20sp"

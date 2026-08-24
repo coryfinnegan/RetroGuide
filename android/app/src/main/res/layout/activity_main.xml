@@ -184,4 +184,43 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+
+    <!-- Settings. Back never exits this app, so an explicit way out belongs
+         here: the quickest fix for a wedged stream is starting over. -->
+    <LinearLayout
+        android:id="@+id/settingsOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/guide_bg"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SETTINGS"
+            android:textColor="@color/guide_amber"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:layout_marginBottom="26dp" />
+
+        <TextView android:id="@+id/settingServer"  style="@style/SettingRow" />
+        <TextView android:id="@+id/settingRestart" style="@style/SettingRow" />
+        <TextView android:id="@+id/settingClose"   style="@style/SettingRow" />
+        <TextView android:id="@+id/settingBack"    style="@style/SettingRow" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="UP/DOWN CHOOSE   OK SELECT   BACK CANCEL"
+            android:textColor="@color/guide_cyan"
+            android:textSize="15sp"
+            android:fontFamily="monospace" />
+    </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
