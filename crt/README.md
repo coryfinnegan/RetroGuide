@@ -127,6 +127,30 @@ so, which is an ErsatzTV setting rather than anything here.
 
 ## Getting it onto the tube
 
+An HDMI-to-AV converter shows up as an ordinary extra monitor, so the job is to
+open the page full screen at that monitor's place on the virtual desktop:
+
+```bash
+python crt/tools/kiosk.py --list                        # which display is it?
+python crt/tools/kiosk.py --host 192.168.1.200:8409     # open it there
+python crt/tools/kiosk.py --set-mode 640x480 --host ... # and feed it 4:3
+```
+
+It finds the converter by its EDID name, starts the server if it is not already
+running, and opens a browser window sized to that display. Two things learned
+doing this:
+
+- **`--kiosk` ignores `--window-position`.** Chrome opens it full screen on the
+  primary display instead, which is no use when the whole point is the third
+  one. An `--app` window sized to the display looks identical and lands where
+  it is told.
+- **Give the converter a 4:3 mode.** These boxes take a 16:9 signal and squash
+  it into a 4:3 picture, so at 1280x720 the tube shows everything horizontally
+  compressed. 640x480 is both 4:3 and exactly what the page is laid out at, so
+  nothing is scaled anywhere in the chain.
+
+
+
 Set the desktop to **640×480 or 800×600** and let the converter output 480i.
 The UI is laid out at 640×480 and scaled as one piece, so it keeps 4:3 on a
 CRT and letterboxes on anything else — a modern panel is fine for setting up.
