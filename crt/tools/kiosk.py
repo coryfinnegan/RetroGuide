@@ -10,11 +10,20 @@ An HDMI-to-AV converter appears to Windows as an ordinary second monitor, so
 the whole job is: find which one it is, and open a full-screen browser at that
 monitor's position on the virtual desktop.
 
-Aspect ratio is the part worth getting right. These converters take a 16:9
-signal and squash it into a 4:3 picture, so a 1280x720 desktop reaches the tube
-horizontally compressed - circles come out as ovals. Feed the converter a 4:3
-mode instead and the geometry is correct; 640x480 also happens to be exactly
-the resolution the page is laid out at, so nothing is scaled at all.
+Aspect ratio is the part worth getting right, and the answer is not the obvious
+one. These converters take a 16:9 signal and squash it into a 4:3 picture, so a
+1280x720 desktop reaches the tube horizontally compressed. The tempting fix is
+to feed it a 4:3 mode - but 640x480 is not the converter's preferred timing,
+and something upstream of the tube then scales 4:3 up to 16:9 with the aspect
+preserved and puts black pillars in the signal. They are real pixels by the time
+they leave the PC, so no screenshot of the framebuffer will show them; they are
+only visible on the tube.
+
+So do the opposite: give the converter its own preferred timing, and pass
+screen=stretch so the page scales its axes independently and uses every pixel of
+that 16:9 raster. The converter squashes the full raster into the full 4:3
+picture, which turns the 4:3 layout back into 4:3 on the tube. Nothing in the
+chain is left with an aspect mismatch to letterbox.
 """
 import argparse
 import ctypes
@@ -158,7 +167,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", help="ErsatzTV address, pinned so setup is skipped")
     ap.add_argument("--display", help=r"e.g. DISPLAY3; default is the converter")
-    ap.add_argument("--set-mode", help="e.g. 640x480 - feed the converter 4:3")
+    ap.add_argument("--set-mode", help="e.g. 1280x720 - usually the converter's own timing")
+    ap.add_argument("--letterbox", action="store_true",
+                    help="do not stretch to fill the raster (for a real monitor)")
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
 
@@ -178,11 +189,11 @@ def main():
         set_mode(target["name"], w, h)
         target = next(s for s in displays() if s["name"] == target["name"])
 
-    if abs(target["w"] / target["h"] - 4 / 3) > 0.02:
-        print("note: %s is %dx%d, which is not 4:3. These converters squash the"
+    if args.letterbox and abs(target["w"] / target["h"] - 4 / 3) > 0.02:
+        print("note: %s is %dx%d, which is not 4:3, and --letterbox means the page"
               % (target["name"], target["w"], target["h"]))
-        print("      picture into 4:3, so it will look horizontally compressed.")
-        print("      Try:  --set-mode 640x480")
+        print("      will bar the sides rather than stretch. On a converter those")
+        print("      bars reach the tube. Drop --letterbox unless this is a monitor.")
 
     if not server_running():
         subprocess.Popen([sys.executable, os.path.join(CRT_DIR, "serve.py")],
@@ -193,21 +204,29 @@ def main():
             time.sleep(0.5)
     print("server: http://localhost:%d/" % PORT)
 
-    url = "http://localhost:%d/" % PORT
+    # screen=stretch by default: this launcher exists to drive a converter, and
+    # a fresh kiosk profile has nothing saved to fall back on.
+    q = []
     if args.host:
-        url += "?host=" + args.host
+        q.append("host=" + args.host)
+    q.append("screen=" + ("letterbox" if args.letterbox else "stretch"))
+    url = "http://localhost:%d/?%s" % (PORT, "&".join(q))
 
     exe = next((c for c in CHROME if os.path.exists(c)), None)
     if not exe:
         sys.exit("no Chrome or Edge found - open %s on that display yourself" % url)
     # --app, not --kiosk: kiosk ignores --window-position and opens full screen
     # on the primary display, which is no use when the point is the third one.
-    # An app window has no browser chrome, so sized to the display it is the
-    # same thing visually.
+    # --start-fullscreen does respect the position, so the window goes to the
+    # converter AND is genuinely full screen there. Both halves are needed: an
+    # --app window still carries a slim title bar, and at 640x480 the taskbar
+    # sits over the bottom of it, so the page gets a 640x449 viewport, scales
+    # itself down to fit, and leaves a black border all the way round.
     subprocess.Popen([
         exe, "--app=" + url,
         "--window-position=%d,%d" % (target["x"], target["y"]),
         "--window-size=%d,%d" % (target["w"], target["h"]),
+        "--start-fullscreen",
         "--autoplay-policy=no-user-gesture-required",
         "--disable-features=TranslateUI",
         # its own profile, so the kiosk never inherits or disturbs your session

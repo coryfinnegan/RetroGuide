@@ -122,6 +122,8 @@ so, which is an ErsatzTV setting rather than anything here.
 | Enter / G | Open the guide — in the guide, watch the highlighted channel |
 | Esc | Close the guide |
 | I | Show the channel banner |
+| A | Picture size — FILL / FIT / STRETCH |
+| S | Screen — stretch to fill the raster, or letterbox |
 | O | Adjust overscan |
 | F | Full screen |
 
@@ -131,29 +133,50 @@ An HDMI-to-AV converter shows up as an ordinary extra monitor, so the job is to
 open the page full screen at that monitor's place on the virtual desktop:
 
 ```bash
-python crt/tools/kiosk.py --list                        # which display is it?
-python crt/tools/kiosk.py --host 192.168.1.200:8409     # open it there
-python crt/tools/kiosk.py --set-mode 640x480 --host ... # and feed it 4:3
+python crt/tools/kiosk.py --list                          # which display is it?
+python crt/tools/kiosk.py --host 192.168.1.200:8409       # open it there
+python crt/tools/kiosk.py --set-mode 1280x720 --host ...  # its preferred timing
 ```
 
 It finds the converter by its EDID name, starts the server if it is not already
-running, and opens a browser window sized to that display. Two things learned
+running, and opens a browser window sized to that display. Three things learned
 doing this:
 
 - **`--kiosk` ignores `--window-position`.** Chrome opens it full screen on the
   primary display instead, which is no use when the whole point is the third
-  one. An `--app` window sized to the display looks identical and lands where
-  it is told.
-- **Give the converter a 4:3 mode.** These boxes take a 16:9 signal and squash
-  it into a 4:3 picture, so at 1280x720 the tube shows everything horizontally
-  compressed. 640x480 is both 4:3 and exactly what the page is laid out at, so
-  nothing is scaled anywhere in the chain.
+  one. An `--app` window lands where it is told, and `--start-fullscreen` — which
+  does respect the position — makes it full screen once it gets there. Both are
+  needed: an `--app` window on its own still carries a slim title bar, and at
+  640x480 the taskbar covers the bottom of it, so the page ends up with a
+  640x449 viewport, scales itself down to fit, and sits in a black border.
+- **Stretch into the converter's own timing; do not hand it 4:3.** These boxes
+  take a 16:9 signal and squash it into a 4:3 picture, so a 720p desktop reaches
+  the tube horizontally compressed. The obvious fix — give it a 4:3 mode like
+  640x480 — is wrong, and wrong in a way that is hard to see: 640x480 is not this
+  converter's preferred timing (its EDID asks for 1280x720), so something
+  upstream scales 4:3 up to 16:9 with the aspect preserved and writes black
+  pillars into the signal. **Those bars are real pixels by the time they leave
+  the PC, so a screenshot of the framebuffer shows a full screen and the tube
+  still shows bars.** Only the tube can tell you.
 
+  So do the opposite. Run the converter at its preferred timing and let the page
+  scale its axes independently (`screen=stretch`, which `kiosk.py` pins) so every
+  pixel of that 16:9 raster is used. The converter maps the whole raster onto the
+  whole 4:3 picture, and the squash turns the 4:3 layout back into 4:3 on the
+  tube. Nothing anywhere in the chain is left with an aspect mismatch to
+  letterbox. **S** toggles it if a display ever wants the honest letterbox back.
+- **The picture inside the picture.** ErsatzTV transcodes to 1920x1080 whatever
+  the source was, so a 4:3 programme arrives with black pillars burnt into the
+  frame. Fitting that 16:9 frame into the 4:3 page adds bars top and bottom too,
+  and the result is windowboxed — a small picture with black on all four sides.
+  The page therefore crops the frame back to 4:3 by default, which takes off
+  almost exactly the pillars ErsatzTV put on. **A** cycles FILL / FIT / STRETCH
+  for the occasional programme that really is widescreen.
 
-
-Set the desktop to **640×480 or 800×600** and let the converter output 480i.
-The UI is laid out at 640×480 and scaled as one piece, so it keeps 4:3 on a
-CRT and letterboxes on anything else — a modern panel is fine for setting up.
+Set the converter to whatever its EDID asks for — `--list` shows what it is on
+now, and `--set-mode` changes it. The UI is laid out at 640×480 and scaled as one
+piece: stretched to fill the raster on the converter, letterboxed on an ordinary
+monitor, which is fine for setting up.
 
 **Set the overscan before anything else.** Press **O** and adjust until the
 amber frame is just inside the visible picture. Every tube crops a different

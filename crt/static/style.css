@@ -44,14 +44,23 @@ html, body {
   overflow: hidden;
 }
 
+/* ErsatzTV transcodes everything to 1920x1080, so a 4:3 programme arrives
+   with black pillars already burnt into the frame. Dropping that 16:9 frame
+   into this 4:3 stage adds bars above and below as well, and the picture ends
+   up windowboxed - small, with black on all four sides. FILL crops the frame
+   back to 4:3, which removes very nearly exactly the pillars ErsatzTV added.
+   FIT is honest about a genuinely widescreen programme; STRETCH is there for
+   a tube whose own geometry is off. Press A. */
 #video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   background: #000;
-  object-fit: contain;
+  object-fit: cover;
 }
+#stage.fit-contain #video { object-fit: contain; }
+#stage.fit-fill    #video { object-fit: fill; }
 
 #safe {
   position: absolute;

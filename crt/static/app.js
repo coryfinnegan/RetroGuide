@@ -21,6 +21,10 @@ const store = {
   set sig(v) { localStorage.setItem("lineup_sig", v); },
   get overscan() { return localStorage.getItem("overscan") || "5"; },
   set overscan(v) { localStorage.setItem("overscan", v); },
+  get videoFit() { return localStorage.getItem("video_fit") || "cover"; },
+  set videoFit(v) { localStorage.setItem("video_fit", v); },
+  get screenFit() { return localStorage.getItem("screen_fit") || "letterbox"; },
+  set screenFit(v) { localStorage.setItem("screen_fit", v); },
 };
 
 let channels = [], guide = {}, current = 0, cursor = 0, firstRow = 0;
@@ -30,15 +34,60 @@ let setupHosts = [], setupCursor = 0;
 
 /* ------------------------------------------------------------ scaling */
 
-/* The whole UI is laid out at 640x480 and scaled as one piece, so it keeps
-   4:3 on a tube and letterboxes politely on anything else. */
+/* The whole UI is laid out at 640x480 and scaled as one piece.
+ *
+ * LETTERBOX keeps it square by scaling both axes the same and centring what is
+ * left over. Right for a monitor; wrong for the converter, because the bars it
+ * leaves are real black pixels in the signal and the tube shows them.
+ *
+ * STRETCH scales the axes independently so every pixel of the framebuffer is
+ * used, whatever shape it is. That is what a converter wants: it maps the whole
+ * input raster onto the whole 4:3 picture, so filling a 16:9 raster with a 4:3
+ * layout comes out 4:3 on the tube - the horizontal squash undoes the stretch.
+ * Feed the converter its own preferred timing this way and nothing anywhere in
+ * the chain has an aspect mismatch left to letterbox.
+ */
 function fit() {
+  const stage = $("stage");
+  if (store.screenFit === "stretch") {
+    stage.style.transform = "scale(" + innerWidth / 640 + "," + innerHeight / 480 + ")";
+    return;
+  }
   const s = Math.min(innerWidth / 640, innerHeight / 480);
   const x = (innerWidth - 640 * s) / 2;
   const y = (innerHeight - 480 * s) / 2;
-  $("stage").style.transform = "translate(" + x + "px," + y + "px) scale(" + s + ")";
+  stage.style.transform = "translate(" + x + "px," + y + "px) scale(" + s + ")";
 }
 addEventListener("resize", fit);
+
+function cycleScreenFit() {
+  store.screenFit = store.screenFit === "stretch" ? "letterbox" : "stretch";
+  fit();
+  toast("SCREEN " + store.screenFit.toUpperCase());
+}
+
+/* How the 16:9 stream sits in the 4:3 stage. Default is cover: nearly every
+   programme here is 4:3 pillarboxed into a 1080p frame, and cropping the frame
+   back to 4:3 takes off the pillars rather than any picture. */
+const FITS = [
+  { key: "cover",   label: "FILL",    cls: "" },
+  { key: "contain", label: "FIT",     cls: "fit-contain" },
+  { key: "fill",    label: "STRETCH", cls: "fit-fill" },
+];
+
+function applyVideoFit() {
+  const f = FITS.find((x) => x.key === store.videoFit) || FITS[0];
+  const stage = $("stage");
+  FITS.forEach((x) => x.cls && stage.classList.remove(x.cls));
+  if (f.cls) stage.classList.add(f.cls);
+  return f;
+}
+
+function cycleVideoFit() {
+  const i = FITS.findIndex((x) => x.key === store.videoFit);
+  store.videoFit = FITS[(i + 1 + FITS.length) % FITS.length].key;
+  toast("PICTURE " + applyVideoFit().label);
+}
 
 function applyOverscan() {
   document.documentElement.style.setProperty("--overscan", store.overscan + "%");
@@ -371,6 +420,8 @@ addEventListener("keydown", (e) => {
   else if (k === "ArrowDown") tune(current + 1);
   else if (k === "Enter" || k.toLowerCase() === "g") openGuide();
   else if (k.toLowerCase() === "i") showBanner();
+  else if (k.toLowerCase() === "a") cycleVideoFit();
+  else if (k.toLowerCase() === "s") cycleScreenFit();
   else if (k.toLowerCase() === "o") { mode = "overscan"; $("overscan").classList.remove("hidden"); }
   else if (k.toLowerCase() === "f") document.documentElement.requestFullscreen().catch(() => {});
   e.preventDefault();
@@ -378,9 +429,15 @@ addEventListener("keydown", (e) => {
 
 /* ?host=192.168.1.200:8409 pins the server, which is handy in the shortcut
    that launches the kiosk so a fresh profile never stops at setup. */
-const pinned = new URLSearchParams(location.search).get("host");
+const params = new URLSearchParams(location.search);
+const pinned = params.get("host");
 if (pinned) store.host = pinned;
+/* ?screen=stretch is pinned by kiosk.py, which knows it is driving a converter
+   and that a fresh browser profile has nothing saved. */
+const pinnedScreen = params.get("screen");
+if (pinnedScreen) store.screenFit = pinnedScreen;
 
 fit();
 applyOverscan();
+applyVideoFit();
 if (store.host) start(); else runSetup();
