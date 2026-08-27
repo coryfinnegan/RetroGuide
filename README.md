@@ -49,15 +49,21 @@ out.
 
 ## Working on this repo with Claude Code
 
-`.claude/skills/` carries a skill per platform — `retroguide-android` and
-`retroguide-roku` — covering the build and install loop, how to drive a real
-device, and the traps each platform has already sprung. They load automatically
-when Claude Code runs from this directory.
+`.claude/skills/` carries a skill per platform — `retroguide-android`,
+`retroguide-roku` and `retroguide-crt` — covering the build and install loop, how
+to drive a real device, and the traps each platform has already sprung. They load
+automatically when Claude Code runs from this directory.
 
 The Roku skill includes `rokudev.py`, which packages, sideloads, launches, sends
 remote keys, takes screenshots and reads the BrightScript console. It takes the
 device address and dev password from `ROKU_IP` and `ROKU_DEV_PASSWORD` so
 neither ends up committed.
+
+The CRT skill includes `crtdev.py`, which lists the displays and their preferred
+timings, launches the kiosk on the converter, sends keys and captures the
+framebuffer. It also carries the warning that matters most on that platform: a
+capture shows what the page drew, not what the tube shows, so it cannot settle a
+question about geometry — only somebody looking at the tube can.
 
 ## Platform differences
 
