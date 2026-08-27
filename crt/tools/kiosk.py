@@ -33,6 +33,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import winreg
 from ctypes import wintypes
 
 CRT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -80,8 +81,14 @@ class DISPLAY_DEVICE(ctypes.Structure):
 
 user32 = ctypes.windll.user32
 ENUM_CURRENT_SETTINGS = -1
+EDD_GET_DEVICE_INTERFACE_NAME = 0x00000001
 CDS_UPDATEREGISTRY = 0x01
 DM_PELSWIDTH, DM_PELSHEIGHT = 0x80000, 0x100000
+
+
+class DisplayError(Exception):
+    """A mode change the display would not take. Raised rather than exited, so
+    the tray app survives asking for something a monitor does not support."""
 
 
 def displays():
@@ -109,6 +116,60 @@ def displays():
             "primary": bool(dd.StateFlags & 0x04),
         })
     return out
+
+
+def dtd(d):
+    """Decode one EDID detailed timing descriptor.
+
+    The active pixel counts are split across a shared byte, and the two nibbles
+    are easy to swap: horizontal upper bits are the HIGH nibble of byte 4,
+    vertical upper bits the HIGH nibble of byte 7. Getting the vertical one
+    wrong reports a 1280x720 display as 1280x208, which reads as broken
+    hardware rather than a broken parser.
+    """
+    px = d[2] | ((d[4] & 0xF0) << 4)
+    py = d[5] | ((d[7] & 0xF0) << 4)
+    hb = d[3] | ((d[4] & 0x0F) << 8)
+    vb = d[6] | ((d[7] & 0x0F) << 8)
+    total = (px + hb) * (py + vb)
+    hz = ((d[1] << 8 | d[0]) * 10000 / total) if total else 0
+    return px, py, hz
+
+
+def monitor_edid(device_name):
+    """The EDID name and preferred timing of the monitor on one display.
+
+    Matched through the monitor's device instance rather than by pairing two
+    lists up by position: EnumDisplayDevices and WmiMonitorID come back in
+    different orders, so index-pairing quietly mislabels every monitor. The
+    interface path holds the hardware id and instance, which is exactly the
+    registry key the EDID lives under.
+    """
+    mon = DISPLAY_DEVICE()
+    mon.cb = ctypes.sizeof(mon)
+    if not user32.EnumDisplayDevicesA(device_name.encode(), 0, ctypes.byref(mon),
+                                      EDD_GET_DEVICE_INTERFACE_NAME):
+        return None
+    parts = mon.DeviceID.decode(errors="replace").split("#")
+    if len(parts) < 3:
+        return None
+    key = r"SYSTEM\CurrentControlSet\Enum\DISPLAY\%s\%s\Device Parameters" % (
+        parts[1], parts[2])
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key) as k:
+            edid = bytes(winreg.QueryValueEx(k, "EDID")[0])
+    except OSError:
+        return None
+    if len(edid) < 128:
+        return None
+    name = ""
+    for off in (54, 72, 90, 108):
+        d = edid[off:off + 18]
+        if d[0:3] == b"\x00\x00\x00" and d[3] == 0xFC:
+            name = d[5:18].decode("ascii", "replace").strip().strip("\n")
+    first = edid[54:72]
+    return {"name": name or "?",
+            "preferred": dtd(first) if (first[0] or first[1]) else None}
 
 
 def monitor_names():
@@ -144,15 +205,53 @@ def set_mode(dev, w, h):
     dm = DEVMODE()
     dm.dmSize = ctypes.sizeof(dm)
     if not user32.EnumDisplaySettingsA(dev.encode(), ENUM_CURRENT_SETTINGS, ctypes.byref(dm)):
-        sys.exit("could not read current mode for %s" % dev)
+        raise DisplayError("could not read current mode for %s" % dev)
     dm.dmPelsWidth, dm.dmPelsHeight = w, h
     dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT
     rc = user32.ChangeDisplaySettingsExA(dev.encode(), ctypes.byref(dm), None,
                                          CDS_UPDATEREGISTRY, None)
     if rc != 0:
-        sys.exit("the display refused %dx%d (code %d) - see --list for what it accepts" % (w, h, rc))
-    print("set %s to %dx%d" % (dev, w, h))
+        raise DisplayError("the display refused %dx%d (code %d) - see --list for "
+                           "what it accepts" % (w, h, rc))
     time.sleep(2)                                # let the mode settle
+
+
+def browser_exe():
+    return next((c for c in CHROME if os.path.exists(c)), None)
+
+
+def page_url(host=None, letterbox=False, port=PORT):
+    # screen=stretch by default: this launcher exists to drive a converter, and
+    # a fresh kiosk profile has nothing saved to fall back on.
+    q = []
+    if host:
+        q.append("host=" + host)
+    q.append("screen=" + ("letterbox" if letterbox else "stretch"))
+    return "http://localhost:%d/?%s" % (port, "&".join(q))
+
+
+def open_kiosk(target, host=None, letterbox=False):
+    """Open the page full screen on one display. Shared with tray.py."""
+    exe = browser_exe()
+    if not exe:
+        return None
+    # --app, not --kiosk: kiosk ignores --window-position and opens full screen
+    # on the primary display, which is no use when the point is the third one.
+    # --start-fullscreen does respect the position, so the window goes to the
+    # converter AND is genuinely full screen there. Both halves are needed: an
+    # --app window still carries a slim title bar, and at 640x480 the taskbar
+    # sits over the bottom of it, so the page gets a 640x449 viewport, scales
+    # itself down to fit, and leaves a black border all the way round.
+    return subprocess.Popen([
+        exe, "--app=" + page_url(host, letterbox),
+        "--window-position=%d,%d" % (target["x"], target["y"]),
+        "--window-size=%d,%d" % (target["w"], target["h"]),
+        "--start-fullscreen",
+        "--autoplay-policy=no-user-gesture-required",
+        "--disable-features=TranslateUI",
+        # its own profile, so the kiosk never inherits or disturbs your session
+        "--user-data-dir=" + os.path.join(os.environ.get("TEMP", "."), "retroguide-kiosk"),
+    ])
 
 
 def server_running():
@@ -186,7 +285,11 @@ def main():
     target = pick_display(args, screens)
     if args.set_mode:
         w, h = (int(v) for v in args.set_mode.lower().split("x"))
-        set_mode(target["name"], w, h)
+        try:
+            set_mode(target["name"], w, h)
+        except DisplayError as e:
+            sys.exit(str(e))
+        print("set %s to %dx%d" % (target["name"], w, h))
         target = next(s for s in displays() if s["name"] == target["name"])
 
     if args.letterbox and abs(target["w"] / target["h"] - 4 / 3) > 0.02:
@@ -204,34 +307,9 @@ def main():
             time.sleep(0.5)
     print("server: http://localhost:%d/" % PORT)
 
-    # screen=stretch by default: this launcher exists to drive a converter, and
-    # a fresh kiosk profile has nothing saved to fall back on.
-    q = []
-    if args.host:
-        q.append("host=" + args.host)
-    q.append("screen=" + ("letterbox" if args.letterbox else "stretch"))
-    url = "http://localhost:%d/?%s" % (PORT, "&".join(q))
-
-    exe = next((c for c in CHROME if os.path.exists(c)), None)
-    if not exe:
-        sys.exit("no Chrome or Edge found - open %s on that display yourself" % url)
-    # --app, not --kiosk: kiosk ignores --window-position and opens full screen
-    # on the primary display, which is no use when the point is the third one.
-    # --start-fullscreen does respect the position, so the window goes to the
-    # converter AND is genuinely full screen there. Both halves are needed: an
-    # --app window still carries a slim title bar, and at 640x480 the taskbar
-    # sits over the bottom of it, so the page gets a 640x449 viewport, scales
-    # itself down to fit, and leaves a black border all the way round.
-    subprocess.Popen([
-        exe, "--app=" + url,
-        "--window-position=%d,%d" % (target["x"], target["y"]),
-        "--window-size=%d,%d" % (target["w"], target["h"]),
-        "--start-fullscreen",
-        "--autoplay-policy=no-user-gesture-required",
-        "--disable-features=TranslateUI",
-        # its own profile, so the kiosk never inherits or disturbs your session
-        "--user-data-dir=" + os.path.join(os.environ.get("TEMP", "."), "retroguide-kiosk"),
-    ])
+    if not open_kiosk(target, args.host, args.letterbox):
+        sys.exit("no Chrome or Edge found - open %s on that display yourself"
+                 % page_url(args.host, args.letterbox))
     print("kiosk opened on %s (%dx%d at %d,%d)"
           % (target["name"], target["w"], target["h"], target["x"], target["y"]))
     print("on the CRT: press O to set overscan, G for the guide, Alt+F4 to quit")

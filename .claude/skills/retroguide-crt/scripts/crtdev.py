@@ -20,7 +20,7 @@ import ctypes
 import os
 import subprocess
 import sys
-import winreg
+
 from ctypes import wintypes
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -35,66 +35,24 @@ kernel32 = ctypes.windll.kernel32
 
 # ------------------------------------------------------------------- displays
 
-def dtd(d):
-    """Decode one EDID detailed timing descriptor.
-
-    The active pixel counts are split across a shared byte, and the two nibbles
-    are easy to swap: the horizontal upper bits are the HIGH nibble of byte 4,
-    the vertical upper bits the HIGH nibble of byte 7. Getting the vertical one
-    wrong reports a 1280x720 display as 1280x208, which reads as a broken
-    monitor rather than a broken parser.
-    """
-    px = d[2] | ((d[4] & 0xF0) << 4)
-    py = d[5] | ((d[7] & 0xF0) << 4)
-    hb = d[3] | ((d[4] & 0x0F) << 8)
-    vb = d[6] | ((d[7] & 0x0F) << 8)
-    total = (px + hb) * (py + vb)
-    hz = ((d[1] << 8 | d[0]) * 10000 / total) if total else 0
-    return px, py, hz
-
-
-def edids():
-    """Each monitor's EDID name and preferred timing, from the registry."""
-    raw = []
-
-    def walk(path):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path)
-        except OSError:
-            return
-        for i in range(winreg.QueryInfoKey(key)[0]):
-            sub = path + "\\" + winreg.EnumKey(key, i)
-            try:
-                dk = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, sub + "\\Device Parameters")
-                raw.append(bytes(winreg.QueryValueEx(dk, "EDID")[0]))
-            except OSError:
-                walk(sub)
-
-    walk("SYSTEM\\CurrentControlSet\\Enum\\DISPLAY")
-    out = []
-    for e in raw:
-        if len(e) < 128:
-            continue
-        name = ""
-        for off in (54, 72, 90, 108):
-            d = e[off:off + 18]
-            if d[0:3] == b"\x00\x00\x00" and d[3] == 0xFC:
-                name = d[5:18].decode("ascii", "replace").strip().strip("\n")
-        first = e[54:72]
-        out.append((name or "?", dtd(first) if (first[0] or first[1]) else None))
-    return out
-
-
 def cmd_list():
-    print("EDID:")
-    for name, pref in edids():
-        print("  %-16s %s" % (name, "preferred %dx%d @ %.0fHz" % pref if pref
-                              else "no detailed timing"))
-    print("displays:")
+    """Each display with the monitor actually on it, and what that monitor asks for.
+
+    The EDID lookup lives in kiosk.monitor_edid rather than here, so there is
+    one parser rather than two drifting apart, and it is keyed by the monitor's
+    device instance - pairing the display list and the monitor list up by
+    position mislabels them, because they come back in different orders.
+    """
     for s in kiosk.displays():
-        print("  %-14s %5dx%-5d at (%5d,%4d) %s  %s"
+        edid = kiosk.monitor_edid(s["name"]) or {}
+        pref = edid.get("preferred")
+        want = "wants %dx%d @ %.0fHz" % pref if pref else "no preferred timing"
+        flag = "" if not pref or (s["w"], s["h"]) == (pref[0], pref[1]) \
+            else "   <-- NOT its preferred timing"
+        print("  %-14s %5dx%-5d at (%5d,%4d) %s  %-14s %s%s"
               % (s["name"], s["w"], s["h"], s["x"], s["y"],
-                 "PRIMARY" if s["primary"] else "       ", s["desc"][:30]))
+                 "PRIMARY" if s["primary"] else "       ",
+                 edid.get("name", "?"), want, flag))
     return 0
 
 
@@ -216,7 +174,12 @@ def cmd_open(host=None):
 
 def cmd_mode(spec):
     width, height = (int(v) for v in spec.lower().split("x"))
-    kiosk.set_mode(converter()["name"], width, height)
+    target = converter()["name"]
+    try:
+        kiosk.set_mode(target, width, height)
+    except kiosk.DisplayError as e:
+        sys.exit(str(e))
+    print("set %s to %dx%d" % (target, width, height))
     return 0
 
 

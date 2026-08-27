@@ -29,6 +29,46 @@ launch this:
 http://localhost:8464/?host=192.168.1.200:8409
 ```
 
+## In the tray, on Windows
+
+The comfortable way to live with this on the PC wired to the tube:
+
+```bash
+pythonw crt/tools/tray.py
+```
+
+It sits in the notification area and serves the page. It deliberately does
+**not** open the Retro Guide by itself — the point of starting with Windows is
+to be ready, not to seize a television every time the PC boots. Click the icon
+and choose a display:
+
+| Menu item | |
+|---|---|
+| **Open Retro Guide on ▸** | every attached display, named by its monitor, with the last one you used ticked |
+| **Close Retro Guide** | shuts the kiosk window, including one opened by `kiosk.py` |
+| **Set ErsatzTV address…** | sweeps the network first if nothing is saved yet |
+| **Open the page in a browser** | an ordinary window here, for setting up |
+| **Match the display's preferred timing** | on by default; see below |
+| **Start with Windows** | writes `HKCU\…\Run`, so no elevation |
+| **Exit** | |
+
+Double-clicking the icon opens on the display you used last, without the menu.
+
+**Match the display's preferred timing** is on by default and is the setting
+that makes the picture come out right. Before opening, it reads the chosen
+display's EDID and, if Windows is feeding it something other than the mode it
+asks for, switches it first. That is the whole geometry lesson in one checkbox —
+a converter fed a mode it did not ask for gets the picture rescaled with the
+aspect preserved somewhere upstream of the tube, and the black bars that puts in
+the signal are invisible to everything except your eyes. Turn it off if you would
+rather set modes yourself.
+
+Settings live in `%APPDATA%\RetroGuide\tray.json`.
+
+Windows 11 puts a new tray icon in the overflow flyout behind the **^**
+chevron rather than on the taskbar itself. Drag it out, or turn it on under
+**Settings → Personalisation → Taskbar → Other system tray icons**.
+
 ## Docker
 
 The image is the page and its little server — **not** the browser. The browser
@@ -124,6 +164,7 @@ so, which is an ErsatzTV setting rather than anything here.
 | I | Show the channel banner |
 | A | Picture size — FILL / FIT / STRETCH |
 | S | Screen — stretch to fill the raster, or letterbox |
+| Alt+F4 | Close the window (the tray app stays running) |
 | O | Adjust overscan |
 | F | Full screen |
 

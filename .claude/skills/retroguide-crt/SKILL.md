@@ -14,12 +14,27 @@ is the only build with an adjustable overscan and a keypad.
 ## Running it
 
 ```bash
+pythonw crt/tools/tray.py                        # the usual way: sit in the tray
 python crt/serve.py --open                       # server + a kiosk browser here
 python crt/tools/kiosk.py --host <etv-host>      # put it on the converter
 ```
 
 The converter is an ordinary extra monitor to Windows, so `kiosk.py` finds it by
 EDID name, starts the server if needed, and opens a browser window there.
+
+`tray.py` is the front door on Windows: a notification-area icon that serves the
+page and opens the kiosk on a display you pick from its menu. It never opens the
+Retro Guide on its own, including at logon — starting with Windows is about being
+ready, not about seizing a television every boot. Layers underneath it:
+
+    tray.py      menu, settings, autostart      -> imports kiosk + serve
+    kiosk.py     displays, EDID, open_kiosk()   -> the launching
+    serve.py     the page and LAN discovery
+    crtdev.py    testing on top of all three    (in this skill)
+
+Put shared logic in `kiosk.py`, which is the layer both the tray and the skill's
+helper import. `crtdev.py` used to carry its own EDID parser and it drifted
+immediately — one parser, in `kiosk.py`.
 
 ## Driving it for testing
 
@@ -32,6 +47,18 @@ python .claude/skills/retroguide-crt/scripts/crtdev.py key s         # send a ke
 python .claude/skills/retroguide-crt/scripts/crtdev.py key Up 3      # surf
 python .claude/skills/retroguide-crt/scripts/crtdev.py shot out.png  # capture the framebuffer
 python .claude/skills/retroguide-crt/scripts/crtdev.py close
+```
+
+`list` flags any display Windows is not feeding its preferred timing, which is
+the first thing to check when the tube looks wrong.
+
+To drive the tray app instead, find its window by class and post a command —
+the ids are stable for exactly this reason:
+
+```python
+hwnd = user32.FindWindowW("RetroGuideTray", None)
+user32.PostMessageW(hwnd, 0x0111, tray.ID_DISPLAY_BASE + index, 0)   # open on a display
+user32.PostMessageW(hwnd, 0x0111, tray.ID_CLOSE_KIOSK, 0)
 ```
 
 Tune to a channel appropriate for whoever might walk past before leaving it —
@@ -116,6 +143,21 @@ PC. Do not reach for it again.
   nibble of byte 4, vertical upper bits the high nibble of byte 7. Swapping them
   reports the converter as 1280x208, which reads as broken hardware rather than a
   broken parser.
+- **Declare `argtypes` for every ctypes call that touches a handle.** Without
+  them ctypes guesses, and a 64-bit `HINSTANCE` gets squeezed into a C int —
+  which raises `OverflowError: int too long to convert` only when the module
+  happens to load high. `CreateWindowExW` in `tray.py` therefore worked under
+  `python.exe` and died instantly under `pythonw.exe`: fine every time it was
+  tested by hand, broken every time Windows started it at logon, which is the
+  only path that actually matters for a startup app. **Test a tray app by the
+  command line in its `Run` key, not the one that is convenient to type.**
+- **`pythonw.exe` has no stderr**, so that crash was completely silent — no
+  window, no icon, no log, nothing in Event Viewer. To see the traceback, run
+  the same `pythonw` command from a shell that already has a console attached,
+  and it prints into it.
+- **A tray app can drive itself for testing.** The command ids in `tray.py` are
+  stable constants, so a test posts `WM_COMMAND` straight at the window found by
+  its class name (`RetroGuideTray`) and never touches a mouse or a menu.
 - **A fresh kiosk profile has nothing in localStorage**, so it stops at the setup
   screen with no keyboard attached and no saved geometry. `kiosk.py` pins both
   `?host=` and `?screen=` in the URL for that reason. Keep new settings pinnable.

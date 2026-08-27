@@ -83,6 +83,11 @@ class Handler(SimpleHTTPRequestHandler):
         pass                                  # a quiet console is a usable console
 
 
+def make_server(port=8464):
+    """The server itself, so the tray app can run one in a thread."""
+    return ThreadingHTTPServer(("0.0.0.0", port), Handler)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8464)
@@ -90,7 +95,7 @@ def main():
     args = ap.parse_args()
 
     url = "http://localhost:%d/" % args.port
-    server = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
+    server = make_server(args.port)
     print("Retro Guide (CRT)  ->  %s" % url)
     print("this machine: %s   ctrl-c to stop" % (local_ip() or "unknown"))
 

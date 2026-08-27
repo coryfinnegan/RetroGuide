@@ -10,7 +10,7 @@ Two apps, one design, one server.
 |---|---|---|
 | [**android/**](android) | Android TV / Google TV | Kotlin, Media3/ExoPlayer |
 | [**roku/**](roku) | Roku / Roku TV | BrightScript, SceneGraph |
-| [**crt/**](crt) | A CRT, fed from a PC | HTML/JS, hls.js, VCR styling |
+| [**crt/**](crt) | A CRT, fed from a PC | HTML/JS, hls.js, VCR styling, a Windows tray app |
 
 Each folder builds and installs independently — see the README inside it. The
 CRT build is self-hosted rather than installed: `python crt/serve.py --open` on
