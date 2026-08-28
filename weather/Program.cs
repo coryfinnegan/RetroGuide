@@ -12,8 +12,19 @@ internal static class Program
     /// thread, and closing the tray icon stops the host.
     /// </summary>
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
+        // --preview <dir> renders the pages to PNGs and exits, without touching
+        // weather.mp4 or the running instance. This is how the layout gets
+        // looked at while the channel is on the air.
+        if (args.Length >= 1 && args[0] is "--preview")
+        {
+            var dir = args.Length >= 2
+                ? args[1]
+                : Path.Combine(Path.GetTempPath(), "weather-preview");
+            return Preview(dir).GetAwaiter().GetResult();
+        }
+
         using var single = new Mutex(true, @"Local\ErsatzTV.WeatherChannel", out var mine);
         if (!mine)
         {
@@ -60,6 +71,23 @@ internal static class Program
             host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
         }
 
+        return 0;
+    }
+
+    private static async Task<int> Preview(string directory)
+    {
+        Directory.CreateDirectory(directory);
+
+        var settings = new SettingsStore();
+        using var http = new HttpClient();
+        NwsClient.Configure(http);
+
+        var logs = LoggerFactory.Create(b => b.AddProvider(new FileLoggerProvider()));
+        var data = await new NwsClient(http, logs.CreateLogger<NwsClient>())
+            .FetchAsync(settings.Current.Latitude, settings.Current.Longitude, default);
+
+        var pages = new PageBuilder(settings).Build(data);
+        await new ChromeRenderer().RenderAsync(pages, directory, default);
         return 0;
     }
 }

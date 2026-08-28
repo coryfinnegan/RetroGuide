@@ -28,15 +28,22 @@ public sealed class VideoEncoder(SettingsStore settings, ILogger<VideoEncoder> l
         IReadOnlyList<string> pngs, string workDirectory, CancellationToken ct)
     {
         var s = settings.Current;
-        var total = s.PageSeconds * pngs.Count;
+        var total = Math.Max(1, s.LoopSeconds);
         var output = Path.GetFullPath(s.OutputPath);
+
+        // Divide the fixed total among the pages rather than multiplying up a
+        // per-page time. Pages are conditional on what the forecast API
+        // returned, and a four-page render at the old fixed 24s each would have
+        // come out 96 seconds long - which ErsatzTV would keep scheduling as
+        // 120, drifting every later item in the playout.
+        var each = (double)total / pngs.Count;
 
         var listing = Path.Combine(workDirectory, "list.txt");
         var text = new StringBuilder();
         foreach (var png in pngs)
         {
             text.Append(CultureInfo.InvariantCulture,
-                $"file '{png.Replace('\\', '/')}'\nduration {s.PageSeconds}\n");
+                $"file '{png.Replace('\\', '/')}'\nduration {each:0.###}\n");
         }
 
         // The concat demuxer ignores the last duration unless the final file is

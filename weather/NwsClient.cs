@@ -40,7 +40,8 @@ public readonly record struct Measurement(double? Value, string Unit)
 }
 
 public sealed record Period(string Name, int Temperature, string ShortForecast,
-                            string DetailedForecast, DateTimeOffset StartTime);
+                            string DetailedForecast, DateTimeOffset StartTime,
+                            bool IsDaytime);
 
 public sealed record Observation(
     string Description, Measurement Temperature, Measurement Dewpoint,
@@ -133,7 +134,8 @@ public sealed class NwsClient(HttpClient http, ILogger<NwsClient> log)
                     p.GetProperty("shortForecast").GetString() ?? "",
                     p.TryGetProperty("detailedForecast", out var d) ? d.GetString() ?? "" : "",
                     DateTimeOffset.Parse(p.GetProperty("startTime").GetString()!,
-                                         CultureInfo.InvariantCulture)));
+                                         CultureInfo.InvariantCulture),
+                    !p.TryGetProperty("isDaytime", out var day) || day.GetBoolean()));
             }
 
             return list;

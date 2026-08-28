@@ -22,12 +22,27 @@ public sealed class WeatherSettings
     public string MusicDirectory { get; set; } = @"D:\ETV\Weather\music";
 
     /// <summary>
-    /// Seconds per page. The total render length is this times the page count,
-    /// and it must not vary between runs - see <see cref="VideoEncoder"/>.
+    /// Total length of the video, in seconds. Fixed, and divided evenly among
+    /// however many pages there are to show.
+    ///
+    /// It is the total that has to be constant, not the per-page time: pages
+    /// are conditional on what the forecast API returned, so a degraded
+    /// response can legitimately produce four pages instead of five. Paying for
+    /// that in page duration rather than in total length is what keeps
+    /// ErsatzTV's stored duration honest - see <see cref="VideoEncoder"/>.
     /// </summary>
-    public int PageSeconds { get; set; } = 24;
+    public int LoopSeconds { get; set; } = 120;
 
     public string FfmpegPath { get; set; } = @"C:\ErsatzTV\ffmpeg.exe";
+
+    /// <summary>
+    /// Percent of each edge kept clear of content, for CRT overscan. A tube
+    /// throws away the outer edge of the picture — how much varies by set, so
+    /// this is a dial rather than a constant. The background still bleeds to
+    /// the edge; only text and panels are inset. Broadcast title-safe is 10;
+    /// raise it if the tube still clips, lower it to use more of the screen.
+    /// </summary>
+    public double SafeAreaPercent { get; set; } = 8;
 
     /// <summary>How long to keep trying to swap the file in while ErsatzTV holds it.</summary>
     public int ReplaceTimeoutSeconds { get; set; } = 420;
