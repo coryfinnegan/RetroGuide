@@ -91,6 +91,16 @@ playing. Trust `[rg] PLAYING` over a screenshot for the preview specifically.
   plane black; render-scaling does not help either. The documented examples set
   the size in XML markup, i.e. before playback. Opening and closing the guide
   therefore stops, resizes and restarts.
+- **This build cannot notice a stall, and the CRT build now can.** Roku reports
+  `state=play` with a frozen `position` when a stream dies under it, so neither
+  the `error` retry nor the `finished` handler fires and the picture stays frozen
+  until somebody presses a button. Observed after ErsatzTV was restarted beneath
+  a running Roku: position stuck at exactly `pos=1187115 seq=304` across several
+  minutes, still "playing". `crt/static/app.js` grew a `watchdog()` for the same
+  failure — poll whether the clock is moving, reopen after 12s of no progress —
+  and this build wants the same thing. **Trust `/query/media-player` position over
+  the reported state.** Related: the `autoRestarts` cap in the `finished` handler
+  resets on every `playing`, so it cannot actually limit a restart loop.
 - **A stutter that only happens on Roku is probably the frame rate changing at a
   splice, and the fix is on the server.** ErsatzTV puts an `EXT-X-DISCONTINUITY`
   between every item, and with **Normalize Frame Rate off** each item keeps its
