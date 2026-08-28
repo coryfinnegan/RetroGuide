@@ -40,6 +40,16 @@ python .claude/skills/retroguide-roku/scripts/rokudev.py key Up 3    # ECP keys
 python .claude/skills/retroguide-roku/scripts/rokudev.py shot out.jpg
 ```
 
+Two things about the console that will otherwise waste an hour. **The Roku accepts
+exactly one connection to port 8085** — a second is refused, and the refusal looks
+identical to the TV being off, when the real cause is usually an earlier capture of
+your own still holding it. And **it replays its recent backlog the moment you
+connect**, while the app's own prints carry no timestamps, so the first screenful of
+history reads exactly like something that just happened. `log` stamps every line with
+the local time it was read, and marks where the replay ends; trust the stamps, not the
+order. For anything about timing, prefer `/query/media-player`, whose numbers are the
+device's own and are unambiguous.
+
 **The console on port 8085 is the whole debugging story.** BrightScript prints
 and crash backtraces go there and nowhere else; a crash mid-launch is otherwise
 invisible. Connect before launching so nothing from startup is missed — that is
@@ -81,6 +91,30 @@ playing. Trust `[rg] PLAYING` over a screenshot for the preview specifically.
   plane black; render-scaling does not help either. The documented examples set
   the size in XML markup, i.e. before playback. Opening and closing the guide
   therefore stops, resizes and restarts.
+- **A stutter that only happens on Roku is probably the frame rate changing at a
+  splice, and the fix is on the server.** ErsatzTV puts an `EXT-X-DISCONTINUITY`
+  between every item, and with **Normalize Frame Rate off** each item keeps its
+  source rate. Channel 8 ran episodes at 23.976 and filler at 29.97, 30, 29.94,
+  15, 12, 12.92 and 59.94, so the stream changed rate several times per ad break
+  and Roku's hardware decoder had to re-initialise each time. Measured on the
+  boundary at 19:28:58: the player delivered **6 seconds of video in 15 seconds
+  of wall clock**, fell from 10s to 28s behind the live edge, and never got the
+  time back — which the viewer sees as a stutter, then a jump back, then a
+  fast-forward as it catches up.
+
+  The other two builds are immune for reasons that have nothing to do with them
+  being better written: hls.js re-initialises MSE per discontinuity and Chrome
+  tolerates mixed rates in one buffer, and Android plays raw MPEG-TS with no
+  segment boundaries at all. **Segmented HLS into a hardware decoder is the
+  fragile combination, and only Roku does it.** So when a playback fault appears
+  on Roku alone, check what the stream changes at an item boundary before
+  reading any BrightScript — no app-side change can reach the decoder.
+
+  Turn on Normalize Frame Rate in the FFmpeg profile (see the `ersatztv` skill;
+  it needs an ErsatzTV **restart**, because profile changes are cached at
+  startup). Verify at the stream, not the app: probe the segment files under
+  `%LOCALAPPDATA%\etv-transcode\<channel>\` across a break and confirm the rate
+  is constant through the splices.
 - **Channel change speed is a server setting, not an app one.** A player waits
   for ~3 target durations before starting, so with ErsatzTV producing one
   segment at a time every cold channel took a suspiciously exact ~13s. Raising

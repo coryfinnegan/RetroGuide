@@ -128,13 +128,29 @@ def cmd_log(seconds=30, launch_first=False):
     try:
         sock = socket.create_connection((need_ip(), 8085), timeout=10)
     except OSError:
-        sys.exit("cannot reach the console on %s:8085 - is the TV on, "
-                 "and developer mode still enabled?" % IP)
+        # The Roku accepts exactly one console connection. A second is refused,
+        # which looks identical to the TV being off - and the usual cause is an
+        # earlier capture of your own still holding it.
+        sys.exit("cannot reach the console on %s:8085.\n"
+                 "Either the TV is off / developer mode is off, or something "
+                 "already has the console: the Roku allows only one connection "
+                 "at a time. Close the other capture and try again." % IP)
     sock.settimeout(1.0)
     time.sleep(0.5)
     if launch_first:
         cmd_launch()
+    # Print each line as it arrives rather than accumulating and dumping at the
+    # end. A fault you are waiting for - one that happens every few minutes,
+    # say - is no use if it only appears once the capture is over; this way it
+    # can be watched, and piped into something that reacts to it.
+    #
+    # Every line is stamped with the local time it was READ. The Roku replays
+    # its recent backlog the moment you connect, and the app's own prints carry
+    # no timestamps, so without this the first screenful of history is
+    # indistinguishable from something that just happened - which is an easy way
+    # to conclude a fault reproduced when you are really reading old news.
     buf = b""
+    saw_any = False
     end = time.time() + float(seconds)
     while time.time() < end:
         try:
@@ -144,9 +160,19 @@ def cmd_log(seconds=30, launch_first=False):
             buf += chunk
         except socket.timeout:
             continue
+        while b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            if not saw_any:
+                print("--- connected; lines above the next marker may be replayed "
+                      "backlog ---", flush=True)
+            saw_any = True
+            print("%s %s" % (time.strftime("%H:%M:%S"),
+                             line.decode("utf-8", "replace").rstrip("\r")), flush=True)
     sock.close()
-    text = buf.decode("utf-8", "replace")
-    print(text if text.strip() else "(console produced no output)")
+    if buf.strip():
+        print(buf.decode("utf-8", "replace").rstrip(), flush=True)
+    elif not saw_any:
+        print("(console produced no output)", flush=True)
 
 
 def main():
