@@ -158,6 +158,21 @@ PC. Do not reach for it again.
 - **A tray app can drive itself for testing.** The command ids in `tray.py` are
   stable constants, so a test posts `WM_COMMAND` straight at the window found by
   its class name (`RetroGuideTray`) and never touches a mouse or a menu.
+- **A dead stream does not announce itself, so do not wait to be told.** When
+  ErsatzTV retires a session the media playlist does not 404 — it answers **302
+  to `/iptv/channel/N.m3u8`, which serves raw MPEG-TS**. hls.js is handed binary
+  where it expects a manifest, and nothing that comes out of that is `fatal`, so
+  an error handler written as `if (!data.fatal) return;` never fires. The picture
+  freezes on the last decoded frame and stays there — found exactly that way,
+  a channel left running and stopped dead for twenty minutes with the app
+  perfectly happy. `watchdog()` therefore polls whether `video.currentTime` is
+  moving and reopens after 12s of no progress, which catches this and every other
+  way a stream can quietly stop.
+
+  **Killing the channel's ffmpeg is not a valid test of this** — ErsatzTV simply
+  restarts the transcoder inside the same session and playback never breaks. Only
+  a genuinely retired session reproduces it, which in practice means restarting
+  ErsatzTV. A test that "passes" without the toast appearing has proved nothing.
 - **A fresh kiosk profile has nothing in localStorage**, so it stops at the setup
   screen with no keyboard attached and no saved geometry. `kiosk.py` pins both
   `?host=` and `?screen=` in the URL for that reason. Keep new settings pinnable.

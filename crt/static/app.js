@@ -10,6 +10,9 @@ const SETTLE_MS = 400;     // let surfing settle before opening a stream
 const BANNER_MS = 5000;
 const GUIDE_REFRESH_MS = 30 * 60 * 1000;
 const VISIBLE_ROWS = 6;
+/* Long enough that a discontinuity between programmes - where the picture can
+   legitimately pause for a few seconds - is never mistaken for a dead stream. */
+const STALL_MS = 12000;
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -31,6 +34,7 @@ let channels = [], guide = {}, current = 0, cursor = 0, firstRow = 0;
 let mode = "setup";                 // setup | watch | guide | overscan
 let hls = null, tuneTimer = null, bannerTimer = null, typed = "", typeTimer = null;
 let setupHosts = [], setupCursor = 0;
+let lastTime = -1, lastAdvance = 0;
 
 /* ------------------------------------------------------------ scaling */
 
@@ -163,10 +167,40 @@ async function signature(list) {
 
 /* ------------------------------------------------------------ playback */
 
+/* A dead stream does not always announce itself.
+ *
+ * When ErsatzTV retires a session, the media playlist does not 404 - it answers
+ * 302 to /iptv/channel/N.m3u8, which serves raw MPEG-TS. So hls.js is handed
+ * binary where it expects a manifest, and what comes out of that is never
+ * anything `fatal`; the error handler below is not called, no retry is
+ * scheduled, and the picture simply freezes on the last decoded frame and stays
+ * there. Found exactly that way: a channel left running for twenty minutes,
+ * stopped dead, with the app perfectly happy.
+ *
+ * So do not wait to be told. Watch whether the clock is moving, which catches
+ * this and every other way a stream can quietly stop.
+ */
+function watchdog() {
+  if (mode === "setup" || !channels.length) return;
+  const video = $("video");
+  if (video.paused || video.ended) return;
+  if (video.currentTime !== lastTime) {
+    lastTime = video.currentTime;
+    lastAdvance = Date.now();
+    return;
+  }
+  if (Date.now() - lastAdvance < STALL_MS) return;
+  toast("STREAM STALLED - REOPENING");
+  lastAdvance = Date.now();          // hold off until this attempt has had a go
+  startStream();
+}
+
 function startStream() {
   const ch = channels[current];
   if (!ch) return;
   const video = $("video");
+  lastTime = -1;
+  lastAdvance = Date.now();
   if (hls) { hls.destroy(); hls = null; }
   if (window.Hls && Hls.isSupported()) {
     hls = new Hls({ liveDurationInfinity: true, enableWorker: true });
@@ -372,6 +406,7 @@ async function start() {
   // cannot change underneath someone watching.
   setInterval(async () => { guide = await loadGuide().catch(() => guide); }, GUIDE_REFRESH_MS);
   setInterval(() => { if (mode === "guide") paintGuide(); }, 30000);
+  setInterval(watchdog, 2000);
 }
 
 /* -------------------------------------------------------------- remote */
