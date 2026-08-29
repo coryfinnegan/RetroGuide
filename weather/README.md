@@ -100,14 +100,27 @@ delete access to the destination. It is not a permission problem. The encoder re
 for seven minutes; every couple of minutes the playout cuts to a commercial, ffmpeg
 closes the file, and the swap lands.
 
-## Known issue
+## The music bed
 
-The video's audio is digital silence, and channel 77's FFmpeg profile applies
-`loudnorm`. Loudness-normalising pure silence produces NaN, which the AAC encoder
-rejects — ErsatzTV logs `Input contains (near) NaN/+-Inf` and the transcode exits −22.
-The session restarts itself, so it shows as a brief dropout rather than a dead channel.
-Putting a real music bed in `MusicDirectory` fixes it; so would putting the channel on
-an FFmpeg profile without loudness normalisation.
+The first audio file in `MusicDirectory` becomes the bed. It is not played from the
+top each time: `MusicOffsetSeconds` advances by one loop length per render and wraps at
+the end of the track, so successive renders walk through a long mix rather than
+replaying its opening every ten minutes. The offset is persisted, so a restart does not
+send it back to the beginning. Each block also fades in and out over 1.5s, so the
+segment comes up out of the commercial break instead of starting on a clipped waveform.
+
+The bed matters for more than atmosphere. With an empty `MusicDirectory` the encoder
+falls back to `anullsrc` — digital silence — and channel 77's FFmpeg profile applies
+`loudnorm`. Loudness-normalising pure silence produces NaN, the AAC encoder rejects it,
+ErsatzTV logs `Input contains (near) NaN/+-Inf`, and the transcode exits −22. The
+session restarts itself, so it showed up as an occasional dropout rather than a dead
+channel. Real audio removes the cause; the alternative is an FFmpeg profile without
+loudness normalisation.
+
+Anything the render writes back to the settings — the music offset is the only case —
+must use `settings.Update(..., notify: false)`. The render loop treats the
+settings-changed event as "render now", so a render that notifies on its own bookkeeping
+wakes itself the moment it finishes and goes round again immediately.
 
 ## Build
 

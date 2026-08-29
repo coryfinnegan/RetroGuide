@@ -24,6 +24,9 @@ public sealed class VideoEncoder(SettingsStore settings, ILogger<VideoEncoder> l
     private const int ScaleWidth = 1440;
     private const int ScaleHeight = 1080;
 
+    /// <summary>Seconds of fade at each end of the music bed.</summary>
+    private const double FadeSeconds = 1.5;
+
     public async Task<int> EncodeAsync(
         IReadOnlyList<string> pngs, string workDirectory, CancellationToken ct)
     {
@@ -73,10 +76,18 @@ public sealed class VideoEncoder(SettingsStore settings, ILogger<VideoEncoder> l
         }
 
         var bed = MusicBed();
+        double? offset = null;
         if (bed is not null)
         {
+            // Walk through the track rather than replaying its opening every
+            // ten minutes: start where the last render finished and wrap at the
+            // end. -ss goes after -stream_loop so the seek lands in the input,
+            // and the loop is only there to cover a bed shorter than one page.
+            offset = NextOffset(bed, total);
             psi.ArgumentList.Add("-stream_loop");
             psi.ArgumentList.Add("-1");
+            psi.ArgumentList.Add("-ss");
+            psi.ArgumentList.Add(offset.Value.ToString("0.###", CultureInfo.InvariantCulture));
             psi.ArgumentList.Add("-i");
             psi.ArgumentList.Add(bed);
         }
@@ -92,6 +103,13 @@ public sealed class VideoEncoder(SettingsStore settings, ILogger<VideoEncoder> l
         [
             "-vf", string.Create(CultureInfo.InvariantCulture,
                 $"scale={ScaleWidth}:{ScaleHeight}:flags=neighbor,fps=24"),
+            // Cut into and out of the music, so the block comes up out of the
+            // commercial break instead of starting on a clipped waveform.
+            "-af", bed is null
+                ? "anull"
+                : string.Create(CultureInfo.InvariantCulture,
+                    $"afade=t=in:st=0:d={FadeSeconds:0.##}," +
+                    $"afade=t=out:st={total - FadeSeconds:0.##}:d={FadeSeconds:0.##}"),
             "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k", "-ac", "2",
             "-map", "0:v:0", "-map", "1:a:0",
@@ -160,6 +178,67 @@ public sealed class VideoEncoder(SettingsStore settings, ILogger<VideoEncoder> l
                 waited = true;
                 await Task.Delay(TimeSpan.FromSeconds(3), ct);
             }
+        }
+    }
+
+    /// <summary>
+    /// Where in the bed this render should start, advancing the stored offset by
+    /// one loop length for next time. Wraps at the end of the track; falls back
+    /// to the top if the duration cannot be read, which just means the mix
+    /// restarts rather than the render failing.
+    /// </summary>
+    private double NextOffset(string bed, int loopSeconds)
+    {
+        var length = Duration(bed);
+        var start = settings.Current.MusicOffsetSeconds;
+        if (length is not { } total || total <= loopSeconds || start >= total || start < 0)
+        {
+            start = 0;
+        }
+
+        var next = length is { } t && t > loopSeconds ? (start + loopSeconds) % t : 0;
+        settings.Update(x => x.MusicOffsetSeconds = next, notify: false);
+        return start;
+    }
+
+    private double? Duration(string path)
+    {
+        var probe = Path.Combine(
+            Path.GetDirectoryName(settings.Current.FfmpegPath) ?? ".", "ffprobe.exe");
+        if (!File.Exists(probe))
+        {
+            return null;
+        }
+
+        var psi = new ProcessStartInfo(probe)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        foreach (var a in new[]
+                 {
+                     "-v", "error", "-show_entries", "format=duration",
+                     "-of", "default=nw=1:nk=1", path,
+                 })
+        {
+            psi.ArgumentList.Add(a);
+        }
+
+        try
+        {
+            using var proc = Process.Start(psi)!;
+            var text = proc.StandardOutput.ReadToEnd().Trim();
+            proc.WaitForExit(20_000);
+            return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture,
+                out var seconds) && seconds > 0 ? seconds : null;
+        }
+        catch (Exception e)
+        {
+            log.LogWarning("could not read the length of the music bed: {Message}", e.Message);
+            return null;
         }
     }
 

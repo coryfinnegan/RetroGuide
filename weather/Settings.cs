@@ -22,6 +22,15 @@ public sealed class WeatherSettings
     public string MusicDirectory { get; set; } = @"D:\ETV\Weather\music";
 
     /// <summary>
+    /// How far into the music bed the next render starts, in seconds. Advanced
+    /// by one loop length each time and wrapped at the end of the track, so
+    /// successive renders walk through the mix instead of replaying its first
+    /// two minutes forever. Persisted so a restart does not send it back to the
+    /// top of the same track.
+    /// </summary>
+    public double MusicOffsetSeconds { get; set; }
+
+    /// <summary>
     /// Total length of the video, in seconds. Fixed, and divided evenly among
     /// however many pages there are to show.
     ///
@@ -97,7 +106,16 @@ public sealed class SettingsStore
         }
     }
 
-    public void Update(Action<WeatherSettings> edit)
+    /// <summary>
+    /// Edit and persist the settings.
+    ///
+    /// <paramref name="notify"/> exists because the render loop treats
+    /// <see cref="Changed"/> as "render now" — so a render that writes back a
+    /// setting of its own would wake itself the moment it finished, and go
+    /// round again immediately. Anything the user changes should notify;
+    /// bookkeeping the render itself writes must not.
+    /// </summary>
+    public void Update(Action<WeatherSettings> edit, bool notify = true)
     {
         lock (_gate)
         {
@@ -114,6 +132,9 @@ public sealed class SettingsStore
             }
         }
 
-        Changed?.Invoke();
+        if (notify)
+        {
+            Changed?.Invoke();
+        }
     }
 }
