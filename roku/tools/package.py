@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the sideload zip.
 
-Roku expects manifest, source/, components/ and images/ at the ROOT of the
+Roku expects manifest, source/, components/, images/ and fonts/ at the ROOT of the
 archive - a zip containing a single top level folder will not install.
 """
 import os
@@ -10,7 +10,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "out", "retroguide.zip")
-INCLUDE = ("manifest", "source", "components", "images")
+INCLUDE = ("manifest", "source", "components", "images", "fonts")
 SKIP_SUFFIX = (".pyc",)
 SKIP_NAMES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 

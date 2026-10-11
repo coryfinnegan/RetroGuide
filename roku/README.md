@@ -17,8 +17,15 @@ address in by hand. The choice is saved to the registry, so it survives reboots.
 - **Live TV** — plays ErsatzTV's HLS streams
 - **Channel surfing** — up/down, with a banner showing the channel number,
   name, and what's on now
-- **TV Guide overlay** — video window top-left, clock top-right, and a grid of
-  channels against three half-hour columns drawn from XMLTV
+- **TV Guide** — an info panel and the picture across the top, then a grid of
+  channels with each programme drawn at its real times from XMLTV and one
+  highlighted programme, in the flat embossed style of the 1990s Prevue
+  Channel (see [THEMES.md](../THEMES.md))
+- **Starts fast** — the picture comes up first (about 1.5 s); the guide, a
+  7 MB file, is read once playback is under way, in about 1.3 s
+- **Recovers a frozen stream** — a watchdog reopens the channel when the picture
+  reports playing but stops moving for 12 s, e.g. after ErsatzTV restarts
+- **Themes** — Classic, Retro 90s, Halloween ([THEMES.md](../THEMES.md))
 - **Wrap-around** — past the last channel returns to the first
 - **Resumes** the last channel watched
 - **Refreshes on launch**, so channels added on the server just appear
@@ -70,7 +77,12 @@ and it is replaced by the next install.
 | Up / Down | Change channel — in the guide, move the highlight |
 | Back | Open the guide — in the guide, leave it without changing channel |
 | OK | Show the channel banner — in the guide, switch to the highlighted channel |
-| Options (`*`) | Change the server address |
+| Hold OK | Settings — theme, server address |
+| Left / Right | In the guide, step through programmes, paging the time at the edges |
+| Rewind / Fast-forward | In the guide, a page of channels at a time |
+
+Settings is on a held OK because on a Roku TV the Options (`*`) button opens the
+TV's own picture panel while video is playing, and the app never hears it.
 
 Back never leaves the app — use Home to exit, as with any TV app.
 
