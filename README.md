@@ -1,8 +1,12 @@
 # Retro Guide
 
+[![android](https://github.com/coryfinnegan/RetroGuide/actions/workflows/android.yml/badge.svg)](https://github.com/coryfinnegan/RetroGuide/actions/workflows/android.yml)
+[![roku](https://github.com/coryfinnegan/RetroGuide/actions/workflows/roku.yml/badge.svg)](https://github.com/coryfinnegan/RetroGuide/actions/workflows/roku.yml)
+[![crt](https://github.com/coryfinnegan/RetroGuide/actions/workflows/crt.yml/badge.svg)](https://github.com/coryfinnegan/RetroGuide/actions/workflows/crt.yml)
+
 A TV player for [ErsatzTV](https://ersatztv.org), styled after the 1990s TV
-Guide channel: a video window in the corner, a clock, and a scrolling grid of
-channels against a blue gradient.
+Guide channel: an info panel beside the picture, a clock, and a grid of
+channels in flat, embossed boxes.
 
 Two apps, one design, one server.
 

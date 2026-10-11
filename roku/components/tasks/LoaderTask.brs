@@ -11,10 +11,10 @@
 ' and only then asks for the guide (mode "guide").
 
 sub init()
-    m.top.functionName = "run"
+    m.top.functionName = "load"
 end sub
 
-sub run()
+sub load()
     host = m.top.host
     out = { channels: [], guide: {}, error: "", ms: 0 }
     clock = CreateObject("roTimespan")

@@ -5,10 +5,10 @@
 ' mistaken for a server.
 
 sub init()
-    m.top.functionName = "run"
+    m.top.functionName = "discover"
 end sub
 
-sub run()
+sub discover()
     ETV_PORT = 8409    ' note: not PORT - identifiers are case insensitive here, so it
                        ' would be the same variable as the message port below
     BATCH = 32          ' concurrent requests; a streaming box is not a scanner
