@@ -3,12 +3,14 @@
 # the server actually hands out the page and everything it loads.
 name: crt
 
+# Runs on every pull request and push to main, so the check always
+# reports and can be marked required. The `changes` job decides whether
+# anything under its paths changed; when nothing did, `crt` is
+# skipped, which GitHub counts as passing.
 on:
   pull_request:
-    paths: ["crt/**", ".claude/skills/retroguide-crt/**", ".github/workflows/crt.yml"]
   push:
     branches: [main]
-    paths: ["crt/**", ".claude/skills/retroguide-crt/**", ".github/workflows/crt.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +18,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            changed:
+              - 'crt/**'
+              - '.claude/skills/retroguide-crt/**'
+              - '.github/workflows/crt.yml'
+
+  crt:
+    needs: changes
+    if: needs.changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -7,12 +7,14 @@
 # "to", "run"), a syntax error, an unknown function.
 name: roku
 
+# Runs on every pull request and push to main, so the check always
+# reports and can be marked required. The `changes` job decides whether
+# anything under its paths changed; when nothing did, `roku` is
+# skipped, which GitHub counts as passing.
 on:
   pull_request:
-    paths: ["roku/**", ".github/workflows/roku.yml"]
   push:
     branches: [main]
-    paths: ["roku/**", ".github/workflows/roku.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -20,7 +22,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            changed:
+              - 'roku/**'
+              - '.github/workflows/roku.yml'
+
+  roku:
+    needs: changes
+    if: needs.changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
