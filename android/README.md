@@ -17,7 +17,8 @@ choice is saved, so it survives reboots and reinstalls of the server.
 - **Channel surfing** — d-pad up/down, with a banner showing the channel number,
   name, and what's on now
 - **TV Guide overlay** — video window top-left, clock top-right, and a grid of
-  channels against three half-hour columns drawn from XMLTV
+  channels with each programme drawn at its real times from XMLTV
+- **Themes** — Classic, Retro 90s, Halloween ([THEMES.md](../THEMES.md))
 - **Direct tuning** — type a channel number on the remote
 - **Resumes** the last channel watched
 - **Refreshes on launch**, so channels added on the server just appear
@@ -64,7 +65,8 @@ you'd rather not enable debugging.
 | Back / Guide | Open the TV Guide; press again to close it |
 | OK / Info | Show the channel banner |
 | Number keys | Tune directly to that channel |
-| Settings / Red | Change the server address |
+| Left / Right | In the guide, move through time a half hour at a time |
+| Menu / Settings / Red | Settings — theme, server address, restart, close |
 
 The guide wraps around, so holding Down past the last channel returns to the
 first. Back never leaves the app — use Home to exit, as with any TV app.

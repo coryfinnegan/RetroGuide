@@ -72,17 +72,20 @@ html, body {
 /* ------------------------------------------------------------------ OSD */
 
 #osd {
+  --fill: var(--t-panel);
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  background: rgba(4, 4, 20, 0.86);
-  border: 4px solid var(--amber);
   padding: 10px 14px;
+  background: var(--fill);
+  box-shadow:
+    inset 3px 3px 0 color-mix(in srgb, var(--fill) 22%, #fff),
+    inset -3px -3px 0 color-mix(in srgb, var(--fill) 40%, #000);
 }
 
 #osdTop {
   display: flex;
   justify-content: space-between;
-  color: var(--amber);
+  color: var(--t-clock);
   letter-spacing: 2px;
 }
 
@@ -93,11 +96,11 @@ html, body {
   margin-top: 4px;
 }
 
-#osdNumber { color: var(--amber); font-size: 40px; }
-#osdName   { font-size: 26px; }
+#osdNumber { color: var(--t-num); font-size: 40px; }
+#osdName   { color: var(--t-title); font-size: 26px; }
 
 #osdSub {
-  color: var(--cyan);
+  color: var(--t-accent);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -110,78 +113,191 @@ html, body {
 
 /* ---------------------------------------------------------------- guide */
 
+/* Every colour is a variable, so a theme (themes.css) only restates the
+   palette and adds its art. These are CLASSIC - the same palettes as
+   GuideTheme.kt on Android and themeFor() on Roku. */
+#stage {
+  --t-bg:       #0c0c3a;
+  --t-panel:    #24248c;
+  --t-rule:     #ffc020;
+  --t-title:    #fff;
+  --t-info:     #dadaff;
+  --t-accent:   #66e0ff;
+  --t-clock:    #ffc020;
+  --t-logo-a:   #ffc020;
+  --t-logo-b:   #fff;
+  --t-frame:    #ffc020;
+  --t-head:     #16166a;
+  --t-head-ink: #ffc020;
+  --t-chan:     #24248c;
+  --t-num:      #fff;
+  --t-chan-ink: #ffc020;
+  --t-tuned:    #66e0ff;
+  --t-cell:     #2c2ca0;
+  --t-cell-ink: #fff;
+  --t-sel:      #ffc020;
+  --t-sel-ink:  #140a00;
+  --t-foot:     #16166a;
+  --t-foot-ink: #dadaff;
+  --t-brand-font: "VCR OSD Mono", "Consolas", monospace;
+  /* A condensed bold sans, as cable boxes used; heavy enough for a tube. */
+  --t-grid-font: "Arial Narrow", "Roboto Condensed", "Liberation Sans Narrow", sans-serif;
+  /* The picture window, top right of the safe area. 4:3 for a 4:3 tube. */
+  --pip-w: 214px;
+  --pip-h: 160px;
+}
+
+/* The raised plate every surface is made of, from the Prevue Channel grid of
+   1993-99: one flat fill, a bright edge top and left, a dark edge bottom and
+   right. No gradients - they band over composite - and no rounded corners.
+   Edges are 2px, the thinnest that does not buzz on an interlaced field. */
+.plate, #setupList li, #settingsList li {
+  --fill: var(--t-cell);
+  background: var(--fill);
+  box-shadow:
+    inset 2px 2px 0 color-mix(in srgb, var(--fill) 22%, #fff),
+    inset -2px -2px 0 color-mix(in srgb, var(--fill) 40%, #000);
+}
+
+/* With the guide open the video shrinks into the picture window instead of
+   the guide covering it. A browser can resize a playing video, unlike Roku. */
+#stage.guiding { background: var(--t-bg); }
+#stage.guiding #video {
+  inset: auto;
+  top: var(--overscan);
+  right: var(--overscan);
+  width: var(--pip-w);
+  height: var(--pip-h);
+}
+
 #guide {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, #1a1a5e 0%, var(--bg) 100%);
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  font-family: var(--t-grid-font);
+  font-weight: bold;
+}
+
+#guideTop { display: flex; gap: 8px; height: var(--pip-h); flex: none; }
+#pipFrame {
+  width: var(--pip-w); height: var(--pip-h); flex: none;
+  outline: 3px solid var(--t-frame);
+}
+
+#panel {
+  --fill: var(--t-panel);
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+}
+#panelHead {
+  display: flex; align-items: center; gap: 6px;
+  padding-bottom: 3px; margin-bottom: 4px;
+  border-bottom: 2px solid var(--t-rule);
+  font-family: var(--t-brand-font);
+  font-size: 22px;
+}
+#guideLogo  { display: none; width: 26px; height: 26px; background: center / contain no-repeat; }
+#logoA { color: var(--t-logo-a); }
+#logoB { color: var(--t-logo-b); flex: 1; }
+#guideClock { color: var(--t-clock); white-space: nowrap; }
+#infoTitle  { color: var(--t-title); font-size: 24px; line-height: 28px; }
+#infoTime   { color: var(--t-accent); font-size: 17px; margin-top: 2px; }
+#infoChannel, #infoNext { color: var(--t-info); font-size: 16px; font-weight: normal; }
+#infoTitle, #infoTime, #infoChannel, #infoNext {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 #guideHead, .row {
   display: grid;
-  grid-template-columns: 200px 1fr 1fr 1fr;
-  align-items: stretch;
+  grid-template-columns: 118px 1fr;
+}
+#guideHead { height: 26px; flex: none; color: var(--t-head-ink); font-size: 16px; line-height: 26px; }
+#guideDate { --fill: var(--t-head); padding-left: 8px; white-space: nowrap; }
+#times { --fill: var(--t-head); }
+
+/* The time bar and every row share one horizontal scale, so a label sits
+   exactly over the moment it names. */
+#times, .line { position: relative; overflow: hidden; }
+#times span { position: absolute; top: 0; padding-left: 6px; white-space: nowrap; }
+#times span.tick {
+  width: 2px; top: 3px; bottom: 3px; padding: 0;
+  background: color-mix(in srgb, var(--t-head) 40%, #000);
+  box-shadow: 2px 0 0 color-mix(in srgb, var(--t-head) 22%, #fff);
 }
 
-#guideHead {
-  background: var(--panel);
-  color: var(--amber);
-  padding: 6px 8px;
-  border-bottom: 4px solid var(--amber);
-  letter-spacing: 1px;
-}
-
-/* The rows share whatever height is left after the header and footer, so the
-   last one is never half drawn - and overscan is adjustable, which changes
-   that height. */
+/* Rows share whatever height is left, as many whole rows as fit - overscan is
+   adjustable, which changes that height. */
 #rows {
   flex: 1;
   display: grid;
   grid-auto-rows: 1fr;
   overflow: hidden;
+  min-height: 0;
 }
 
-.row { border-bottom: 2px solid #000; }
-.row.a  { background: var(--row-a); }
-.row.b  { background: var(--row-b); }
-.row.on { background: #1d1d55; }          /* the channel currently playing */
-.row.cursor { background: var(--sel); }
+.chan {
+  --fill: var(--t-chan);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  overflow: hidden; padding: 0 4px;
+}
+.num  { color: var(--t-num); font-size: 18px; line-height: 20px; }
+.row.on .num { color: var(--t-tuned); }
+.name {
+  color: var(--t-chan-ink); font-size: 12px; line-height: 15px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-transform: uppercase;
+}
 
-.chan { display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
-.num  { color: var(--amber); }
-.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row.on .name { color: var(--cyan); }
-
-/* A programme spanning more than one half hour is one cell, not repeated. */
+/* One block per programme, placed by its real start and stop. */
 .cell {
-  padding: 6px 8px;
-  border-left: 2px solid #000;
+  position: absolute;
+  top: 0; bottom: 0;
+  padding: 0 7px;
+  color: var(--t-cell-ink);
+  display: flex; align-items: center; gap: 4px;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  /* Fixed line box and a matching cap, so a long title is cut between lines
-     rather than through the middle of one - half a row of letters reads as
-     a fault on a CRT, where everything is already soft. */
   font-size: 16px;
-  line-height: 22px;   /* comfortably taller than the glyphs, so descenders
-                          are never sliced by the cap below */
-  height: 44px;        /* exactly two line boxes */
+  line-height: 19px;
 }
+.cell.sel { --fill: var(--t-sel); color: var(--t-sel-ink); }
+.cell .t {
+  flex: 1; min-width: 0;
+  overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow-wrap: normal; word-break: keep-all;
+}
+/* A title whose longest word is wider than its block: one cut line, never a
+   word broken in half. app.js decides. */
+.cell .t.one { display: block; white-space: nowrap; text-overflow: ellipsis; }
+/* The Prevue grid marked a programme that runs off either edge with a
+   triangle. Drawn with borders, so it needs no font glyph. */
+.cell .arr { width: 0; height: 0; flex: none; border: 6px solid transparent; }
+.cell .arr.l { border-right-color: currentColor; border-left-width: 0; }
+.cell .arr.r { border-left-color: currentColor; border-right-width: 0; }
 
 #guideFoot {
-  background: var(--panel);
-  color: var(--amber);
-  padding: 4px 8px;
-  border-top: 4px solid var(--amber);
-  font-size: 15px;
-  letter-spacing: 1px;
+  --fill: var(--t-foot);
+  height: 26px; flex: none;
+  color: var(--t-foot-ink);
+  font-size: 15px; line-height: 26px;
+  display: flex; justify-content: center; gap: 16px;
+  white-space: nowrap; overflow: hidden;
 }
+#guideFoot .dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-right: 5px;
+}
+
+#deco { display: none; }
 
 /* ------------------------------------------------- setup and overscan */
 
-#setup, #overscan {
+#setup, #overscan, #settings {
   position: absolute;
   inset: 0;
   background: var(--bg);
@@ -191,9 +307,18 @@ html, body {
 h1 { color: var(--amber); font-size: 30px; letter-spacing: 4px; margin-bottom: 12px; }
 #setupStatus { margin-bottom: 14px; }
 #setupList { list-style: none; }
-#setupList li { padding: 8px 10px; background: var(--row-b); margin-bottom: 6px; }
-#setupList li.cursor { background: var(--sel); }
-.hint { color: var(--cyan); font-size: 15px; margin-top: 16px; }
+#setup, #settings { background: var(--t-bg) !important; }
+#settings h1 { color: var(--t-logo-a); font-family: var(--t-brand-font); text-align: center; }
+#setupList li, #settingsList li {
+  padding: 8px 12px; margin-bottom: 6px; color: var(--t-cell-ink);
+  font-family: var(--t-grid-font); font-weight: bold; font-size: 20px;
+}
+#setupList li.cursor, #settingsList li.cursor { --fill: var(--t-sel); color: var(--t-sel-ink); }
+#settingsList li.cursor .val { color: var(--t-sel-ink); }
+#settingsList { list-style: none; }
+#settingsList li { display: flex; justify-content: space-between; }
+#settingsList .val { color: var(--t-accent); }
+.hint { color: var(--t-info); font-size: 15px; margin-top: 16px; }
 
 #overscanFrame {
   position: absolute;

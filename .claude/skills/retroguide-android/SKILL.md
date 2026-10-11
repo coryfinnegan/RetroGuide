@@ -96,13 +96,26 @@ TV, and blind channel-surfing tests have landed on horror.
   quick test does. Rebind only when the content actually changed (here, when
   the half hour rolls over) and put focus back afterwards.
 - **`KEYCODE_SETTINGS` never reaches the app.** Google TV opens its own system
-  panel over the top. `KEYCODE_MENU` does arrive, and is free once BACK opens
-  the guide.
+  panel over the top, and the Google TV remote has no MENU button at all - so
+  SETTINGS is on a **held OK** (`onKeyLongPress`; OK acts on release unless it
+  was held). MENU still works on remotes that have one. Test a hold over adb
+  with `input keyevent --longpress KEYCODE_DPAD_CENTER`.
 - **Parse channel numbers as float, not int.** A multiplex uses sub-channel
   numbers like `23.1`, and `toIntOrNull()` returns null for those - they all
   landed in the `Int.MAX_VALUE` bucket at the bottom of the list, nowhere near
   the channel they belong to. Leave room in the number column for four
   characters too.
+- **Never make playback wait for the guide.** The XMLTV grew to 7 MB, and
+  with a `SimpleDateFormat` built per timestamp the TV sat on TUNING for
+  ~30s every launch. Channels load, the picture starts, then the guide loads
+  in the background and repaints the banner and guide when it lands (7s to
+  picture now). Times are parsed by hand in `Source.parseTime`.
+- **Custom fonts may not draw "…".** The retro theme's star4000 renders
+  it as nothing, so TextView/StaticLayout ellipsizing silently cut names
+  mid-word. `fitOneLine`/`ellipsisFor` in `Timeline.kt` truncate by hand,
+  using "..." for any theme font.
+- **Run Gradle with JDK 17+.** The default `java` here is 8; use
+  `JAVA_HOME="/c/Program Files/Android/openjdk/jdk-21.0.8"`.
 - **Register a `Player.Listener`.** Without one a failed open is a silent black
   screen with nothing in the log.
 

@@ -31,10 +31,15 @@ Both talk to the same two standard endpoints — `/iptv/channels.m3u` and
 - **Live TV** with channel surfing and a banner showing the channel number,
   name, and what's on now
 - **TV Guide overlay** — video window top-left showing what you are watching,
-  clock top-right, and a grid of channels against three half-hour columns drawn
-  from XMLTV, wrapping around at both ends. The cursor moves the highlight; OK
-  changes the channel. A programme covering more than one half hour is drawn as
-  a single block rather than repeated per column, so a film reads as a film
+  clock top-right, and a grid of channels against ninety minutes of XMLTV,
+  wrapping around at both ends. The cursor moves the highlight; OK changes the
+  channel; left/right moves through time a half hour at a time
+- **Accurate times** — each programme is drawn at its real start and stop
+  rather than snapped to half-hour columns. Almost nothing on ErsatzTV starts
+  on a half hour, so the columns showed one cartoon in four and every edge was
+  wrong. Runs of shorts too brief to label become one block spanning them
+- **Themes** — Classic, Retro 90s and Halloween, picked in settings. See
+  [THEMES.md](THEMES.md) for where the artwork comes from
 - **Resumes** the last channel watched, and reads the lineup on launch. The
   channel list is deliberately *not* re-read while the app runs — swapping
   channels underneath someone watching is worse than a stale list — so a

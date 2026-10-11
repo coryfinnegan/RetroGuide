@@ -72,6 +72,20 @@ playing. Trust `[rg] PLAYING` over a screenshot for the preview specifically.
 - **Escape `&` in XML** — an unescaped one makes the whole component fail to
   parse.
 - **Network work belongs in a `Task` node**, never the render thread.
+- **`pos` and `to` are reserved** (`pos` is a builtin). As variable or parameter
+  names they fail to compile with "Builtin function call expected" - the
+  compile error only appears on the console, and the app simply never starts.
+- **Never index into a multi-megabyte string.** On the 7 MB XMLTV, both
+  `roRegex.MatchAll` and `Instr`/`Mid` hopping through the string ran for over
+  a minute without finishing - character offsets into a string that size are
+  not cheap. `text.Split("<programme start=...")` once, then work on the short
+  pieces: the whole guide parses in under a second. The old `roXMLElement`
+  parse took ~7 s.
+- **The system font has no arrow glyphs** - "◀ ▶ ▲ ▼" render as empty boxes.
+  The hint bar draws them from `images/ui/tri_*.png`, tinted with `blendColor`.
+- **A `Label` with `wrap` breaks inside a word** that is wider than the label
+  ("Loone / y Tunes"). `widestWord()` measures with an offscreen Label and
+  falls back to one cut line.
 - **Sort channel numbers with `ToFloat`, not `ToInt`.** Sub-channel numbers like
   `23.1` are how a multiplex sits beside its parent; `ToInt` collapses them all
   to 23 and their order becomes whatever the M3U happened to list.
@@ -91,16 +105,18 @@ playing. Trust `[rg] PLAYING` over a screenshot for the preview specifically.
   plane black; render-scaling does not help either. The documented examples set
   the size in XML markup, i.e. before playback. Opening and closing the guide
   therefore stops, resizes and restarts.
-- **This build cannot notice a stall, and the CRT build now can.** Roku reports
-  `state=play` with a frozen `position` when a stream dies under it, so neither
-  the `error` retry nor the `finished` handler fires and the picture stays frozen
-  until somebody presses a button. Observed after ErsatzTV was restarted beneath
-  a running Roku: position stuck at exactly `pos=1187115 seq=304` across several
-  minutes, still "playing". `crt/static/app.js` grew a `watchdog()` for the same
-  failure — poll whether the clock is moving, reopen after 12s of no progress —
-  and this build wants the same thing. **Trust `/query/media-player` position over
-  the reported state.** Related: the `autoRestarts` cap in the `finished` handler
-  resets on every `playing`, so it cannot actually limit a restart loop.
+- **A stall does not announce itself; `onWatchdog` catches it.** Roku reports
+  `state=play` (or `buffering`) with a frozen `position` when a stream dies under
+  it, so neither the `error` retry nor the `finished` handler fires. The
+  watchdog polls `video.position` every 2 s and reopens after 12 s without
+  progress - verified 2026-10-11 by restarting ErsatzTV under a playing Roku:
+  frozen at 13:36:13, `STALLED ... reopening` at 13:36:25, playing 0.5 s later.
+  The `autoRestarts` cap is now cleared only after 30 s of real playback; it
+  used to reset on every `playing`, so it could never stop a loop.
+- **`/query/media-player` reports position in 0.5 s steps.** Sampled every
+  0.5 s it looks like 0.97x playback with a 1.2x catch-up every ~15 s - an
+  artifact, not a stutter. Judge smoothness over a long span (33.85 s of video
+  in 33.95 s of wall clock is smooth) or look for a *frozen* position.
 - **A stutter that only happens on Roku is probably the frame rate changing at a
   splice, and the fix is on the server.** ErsatzTV puts an `EXT-X-DISCONTINUITY`
   between every item, and with **Normalize Frame Rate off** each item keeps its
@@ -148,3 +164,9 @@ the zip — an archive containing a single top-level folder will not install.
 
 ECP key names are not the app's key names: the remote's OK button is
 `Select` over ECP but arrives as `"OK"` in `onKeyEvent`.
+
+**`*` (options) never reaches the app on a Roku TV while video plays** - the TV
+opens its own picture-settings panel instead. Settings is therefore on a held
+OK: OK is acted on at release, and a 0.8 s timer started at press decides
+whether it was held. Test a hold over ECP with `keydown/Select`, a pause, then
+`keyup/Select`.

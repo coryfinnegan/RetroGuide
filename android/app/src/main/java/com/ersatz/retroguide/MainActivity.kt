@@ -1,22 +1,23 @@
 package com.ersatz.retroguide
 
 import android.content.Intent
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.ersatz.retroguide.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -38,6 +39,22 @@ class MainActivity : AppCompatActivity() {
     private var settingsOpen = false
     private var settingsCursor = 0
 
+    /** Half hours the guide is paged forward. */
+    private var page = 0
+    private var theme = GuideTheme.CLASSIC
+    /** The theme's logo and clock typeface, or null for bold monospace. */
+    private var face: Typeface? = null
+
+    /**
+     * The guide cursor: a row, and a moment in time on it. The highlighted
+     * block is whichever one covers that moment, so moving up and down keeps
+     * the cursor in the same part of the schedule, as a cable box does.
+     */
+    private var selRow = 0
+    private var selTime = 0L
+    /** First row on screen. */
+    private var gridTop = 0
+
     private val handler = Handler(Looper.getMainLooper())
     private val hideBanner = Runnable { ui.banner.visibility = View.GONE }
 
@@ -45,32 +62,21 @@ class MainActivity : AppCompatActivity() {
     private val typed = StringBuilder()
     private val commitTyped = Runnable { tuneToNumber(typed.toString()); typed.clear() }
 
-    /** The half-hour the guide columns were last drawn for. */
+    /** The start of the window the grid was last drawn for. */
     private var paintedSlot = 0L
 
     private val tick = object : Runnable {
         override fun run() {
-            ui.clock.text = SimpleDateFormat("h:mm a", Locale.US).format(Date())
-            // Rebinding the rows takes focus off whatever row the cursor is on,
-            // and doing that every 30 seconds made the guide look like it had
-            // stopped scrolling - the next press would start again from the top.
-            // The cells only change when the half hour rolls over, so only then.
-            if (guideOpen && slots()[0] != paintedSlot) refreshGuideRows()
+            paintClock()
+            // The blocks only move when the half hour rolls over, so only
+            // redraw the grid then. The cursor is never moved by a redraw.
+            if (guideOpen && window().a != paintedSlot) {
+                selTime = maxOf(selTime, window().a)
+                paintGrid()
+            }
             handler.postDelayed(this, 30_000)
         }
     }
-
-    /** Redraw the rows, putting the cursor back where the viewer left it. */
-    private fun refreshGuideRows() {
-        paintedSlot = slots()[0]
-        val focused = ui.guideList.focusedChild
-            ?.let { ui.guideList.getChildAdapterPosition(it) }
-            ?.takeIf { it != RecyclerView.NO_POSITION }
-        adapter?.notifyDataSetChanged()
-        focused?.let { focusGuideRow(it) }
-    }
-
-    private var adapter: GuideAdapter? = null
 
     /** True when the server was unreachable and OK should reopen setup. */
     private var awaitingSetup = false
@@ -108,18 +114,22 @@ class MainActivity : AppCompatActivity() {
          */
         const val STALE_AFTER_MS = 5 * 60_000L
 
-        /** Matches @style/GuideCell; a merged cell takes this times its span. */
-        const val CELL_WEIGHT = 2f
+        /** How far forward the guide can be paged, in half hours. */
+        const val MAX_PAGES = 16
     }
 
     // ------------------------------------------------------------ settings
 
     private val settingsRows by lazy {
-        listOf(ui.settingServer, ui.settingRestart, ui.settingClose, ui.settingBack)
+        listOf(ui.settingTheme, ui.settingServer, ui.settingRestart, ui.settingClose, ui.settingBack)
     }
-    private val settingsLabels = listOf(
-        "CHANGE SERVER ADDRESS", "RESTART APP", "CLOSE APP", "BACK TO TV"
-    )
+    private fun settingsLabel(i: Int) = when (i) {
+        0 -> "THEME   ◀ ${theme.label} ▶"
+        1 -> "CHANGE SERVER ADDRESS"
+        2 -> "RESTART APP"
+        3 -> "CLOSE APP"
+        else -> "BACK TO TV"
+    }
 
     private fun openSettings() {
         settingsOpen = true
@@ -136,31 +146,123 @@ class MainActivity : AppCompatActivity() {
 
     private fun paintSettings() {
         settingsRows.forEachIndexed { i, row ->
-            row.text = settingsLabels[i]
-            row.setBackgroundColor(
-                ContextCompat.getColor(
-                    this, if (i == settingsCursor) R.color.guide_sel else R.color.guide_row_b
-                )
-            )
-            row.setTextColor(
-                ContextCompat.getColor(
-                    this, if (i == settingsCursor) R.color.guide_cyan else R.color.guide_white
-                )
-            )
+            val on = i == settingsCursor
+            row.text = settingsLabel(i)
+            row.typeface = GRID_FACE
+            row.background = plate(if (on) theme.sel else theme.cell)
+            row.setTextColor(if (on) theme.selInk else theme.cellInk)
         }
+    }
+
+    /** Step through the themes, save the choice, and repaint in it at once. */
+    private fun cycleTheme(step: Int) {
+        val all = GuideTheme.ALL
+        val i = all.indexOf(theme).coerceAtLeast(0)
+        theme = all[(i + step + all.size) % all.size]
+        Prefs.setTheme(this, theme.key)
+        applyTheme()
+        paintSettings()
+    }
+
+    /** An embossed plate, the shape every guide surface is made of. */
+    private fun plate(fill: Int) = Emboss.Plate(fill, 2 * resources.displayMetrics.density)
+
+    /**
+     * Dress the screen in the current theme: surfaces, colours, logo, the
+     * typefaces, and the theme's art.
+     */
+    private fun applyTheme() {
+        face = if (theme.font != 0) ResourcesCompat.getFont(this, theme.font) else null
+        val brand = face ?: Typeface.MONOSPACE
+        val dp = resources.displayMetrics.density
+        ui.guideOverlay.setBackgroundColor(theme.bg)
+        ui.settingsOverlay.setBackgroundColor(theme.bg)
+
+        ui.infoPanel.background = plate(theme.panel)
+        ui.panelRule.setBackgroundColor(theme.rule)
+        ui.windowFrame.background = GradientDrawable().apply {
+            setColor(0xFF000000.toInt()); setStroke((3 * dp).toInt(), theme.frame)
+        }
+        ui.logoArt.visibility = if (theme.logoArt != 0) View.VISIBLE else View.GONE
+        if (theme.logoArt != 0) ui.logoArt.setImageResource(theme.logoArt)
+        ui.logoA.text = theme.logoA
+        ui.logoB.text = theme.logoB
+        ui.logoA.setTextColor(theme.logoAInk)
+        ui.logoB.setTextColor(theme.logoBInk)
+        ui.clock.setTextColor(theme.clock)
+        listOf(ui.logoA, ui.logoB, ui.clock).forEach { it.setTypeface(brand, Typeface.BOLD) }
+
+        ui.infoTitle.setTextColor(theme.titleInk)
+        ui.infoTime.setTextColor(theme.accentInk)
+        ui.infoChannel.setTextColor(theme.infoInk)
+        ui.infoNext.setTextColor(theme.infoInk)
+        ui.infoTitle.typeface = GRID_FACE
+        listOf(ui.infoTime, ui.infoChannel, ui.infoNext)
+            .forEach { it.typeface = Typeface.create("sans-serif-condensed", Typeface.NORMAL) }
+
+        ui.guideFooter.background = plate(theme.foot)
+        ui.guideFooter.setTextColor(theme.footInk)
+        ui.guideFooter.typeface = GRID_FACE
+        ui.guideFooter.text = footerHints()
+
+        ui.banner.background = plate(theme.panel)
+        ui.bannerNumber.setTextColor(theme.numInk)
+        ui.bannerName.setTextColor(theme.titleInk)
+        ui.bannerNow.setTextColor(theme.accentInk)
+        listOf(ui.bannerNumber, ui.bannerName).forEach { it.setTypeface(GRID_FACE, Typeface.BOLD) }
+        ui.bannerNow.typeface = GRID_FACE
+
+        ui.settingsTitle.setTextColor(theme.logoAInk)
+        ui.settingsTitle.setTypeface(brand, Typeface.BOLD)
+        ui.settingsHint.setTextColor(theme.infoInk)
+        ui.settingsHint.typeface = GRID_FACE
+        ui.status.setTextColor(theme.clock)
+        ui.status.typeface = GRID_FACE
+
+        ui.decoLayer.removeAllViews()
+        for (d in theme.deco) {
+            ui.decoLayer.addView(ImageView(this).apply {
+                setImageResource(d.drawable)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }, FrameLayout.LayoutParams((d.sizeDp * dp).toInt(), (d.sizeDp * dp).toInt(), d.gravity).apply {
+                setMargins((d.xDp * dp).toInt(), (d.yDp * dp).toInt(), (d.xDp * dp).toInt(), (d.yDp * dp).toInt())
+            })
+        }
+        if (guideOpen) { paintGrid(); paintInfo() }
+    }
+
+    /** The key-hint bar, each key behind a dot in a remote's button colours. */
+    private fun footerHints(): CharSequence {
+        val hints = listOf(
+            0xFF4CD964.toInt() to "OK  Watch",
+            0xFFFFD60A.toInt() to "◀ ▶  Time",
+            0xFF0A84FF.toInt() to "▲ ▼  Channels",
+            0xFFFF453A.toInt() to "HOLD OK  Settings",
+            0xFFB0B0B0.toInt() to "BACK  Close",
+        )
+        val sb = SpannableStringBuilder()
+        hints.forEachIndexed { i, (dot, text) ->
+            if (i > 0) sb.append("      ")
+            val s = sb.length
+            sb.append("● ")
+            sb.setSpan(ForegroundColorSpan(dot), s, s + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.append(text)
+        }
+        return sb
     }
 
     private fun chooseSetting() {
         when (settingsCursor) {
-            0 -> openSetup()
-            1 -> {
+            0 -> cycleTheme(1)
+            1 -> openSetup()
+            2 -> {
                 // A fresh process is the quickest cure for a wedged stream.
                 val intent = packageManager.getLaunchIntentForPackage(packageName)
                 intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                 finishAffinity()
                 startActivity(intent)
             }
-            2 -> finishAffinity()
+            3 -> finishAffinity()
             else -> closeSettings()
         }
     }
@@ -180,7 +282,8 @@ class MainActivity : AppCompatActivity() {
         // holds the screen awake; a player has to say so itself.
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        ui.guideList.layoutManager = LinearLayoutManager(this)
+        theme = GuideTheme.of(Prefs.theme(this))
+        applyTheme()
 
         // No server configured yet - send the user to setup rather than failing.
         if (!Prefs.apply(this)) {
@@ -194,30 +297,34 @@ class MainActivity : AppCompatActivity() {
         handler.post(tick)
     }
 
+    /**
+     * Channels first, picture next, guide last.
+     *
+     * The guide is a 7 MB download that takes the TV seconds to read, and it
+     * used to be read before anything played, so every launch sat on TUNING.
+     * Nothing about playback needs it - the banner and the guide fill in when
+     * it lands.
+     */
     private fun load() {
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val ch = Source.loadChannels()
-                    // A missing guide should not stop playback - channels matter more.
-                    val g = runCatching { Source.loadGuide() }.getOrDefault(emptyMap())
-                    ch to g
-                }
-            }
-            result.onSuccess { (ch, g) ->
-                channels = ch; guide = g
+            val result = withContext(Dispatchers.IO) { runCatching { Source.loadChannels() } }
+            result.onSuccess { ch ->
+                channels = ch
                 if (ch.isEmpty()) {
                     ui.status.text = "NO CHANNELS AT ${Source.host}"
                     return@onSuccess
                 }
                 ui.status.visibility = View.GONE
                 reportLineupChange(ch)
-                adapter = GuideAdapter().also { ui.guideList.adapter = it }
                 startPlayer()
                 val resume = Prefs.lastChannel(this@MainActivity)
                     ?.let { n -> ch.indexOfFirst { it.number == n } }
                     ?.takeIf { it >= 0 } ?: 0
                 tune(resume)
+                // Opened while the lineup was still loading: put the cursor
+                // on the channel now that there is one.
+                if (guideOpen) openGuide()
+                loadGuide()
             }.onFailure {
                 // A server that has moved is the common case here, so offer the
                 // fix rather than just reporting the failure.
@@ -225,6 +332,22 @@ class MainActivity : AppCompatActivity() {
                 ui.status.text = "CANNOT REACH ${Source.host}\n" +
                         (it.message ?: "") + "\n\nPress OK to change the server address."
                 awaitingSetup = true
+            }
+        }
+    }
+
+    /** Read the listings in the background and repaint whatever shows them. */
+    private fun loadGuide() {
+        lifecycleScope.launch {
+            // A missing guide should not stop playback - channels matter more.
+            val g = withContext(Dispatchers.IO) {
+                runCatching { Source.loadGuide() }.getOrDefault(emptyMap())
+            }
+            if (g.isEmpty()) return@launch
+            guide = g
+            if (guideOpen) { paintGrid(); paintInfo() }
+            else channels.getOrNull(current)?.let { ch ->
+                if (ui.banner.visibility == View.VISIBLE) showBanner(ch)
             }
         }
     }
@@ -268,7 +391,9 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         }
-        ui.fullPlayer.player = player
+        // The guide may already be open if it was asked for while the lineup
+        // loaded; the picture belongs in its corner window then, not behind it.
+        if (guideOpen) ui.windowPlayer.player = player else ui.fullPlayer.player = player
     }
 
     private fun tune(index: Int) {
@@ -277,7 +402,7 @@ class MainActivity : AppCompatActivity() {
         val ch = channels[current]
         Prefs.setLastChannel(this, ch.number)
         showBanner(ch)
-        adapter?.notifyDataSetChanged()
+        if (guideOpen) paintGrid()
         // The banner follows the remote immediately; the stream waits until
         // the viewer stops surfing. Also cancels a pending retry for the
         // channel we are leaving.
@@ -304,8 +429,10 @@ class MainActivity : AppCompatActivity() {
         if (i >= 0) tune(i) else showBannerText(number, "NO SUCH CHANNEL", "")
     }
 
-    private fun nowOn(ch: Channel): Programme? =
-        ch.tvgId?.let { guide[it] }?.at(System.currentTimeMillis())
+    private fun programmeAt(ch: Channel, t: Long): Programme? =
+        ch.tvgId?.let { guide[it] }?.at(t)
+
+    private fun nowOn(ch: Channel): Programme? = programmeAt(ch, System.currentTimeMillis())
 
     private fun showBanner(ch: Channel) {
         val now = nowOn(ch)
@@ -316,7 +443,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         showBannerText(ch.number, ch.name, now?.let {
-            "${hhmm(it.start)}–${hhmm(it.stop)}  ${it.title}"
+            "${shortTime(it.start)} – ${shortTime(it.stop)}   ${it.title}"
         } ?: "")
     }
 
@@ -331,30 +458,32 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------------------------------------------------------- guide
 
-    /** Half-hour slot boundaries starting at the current half hour. */
-    private fun slots(): List<Long> {
-        val now = System.currentTimeMillis()
-        val half = 30 * 60 * 1000L
-        val base = now - (now % half)
-        return listOf(base, base + half, base + 2 * half, base + 3 * half)
+    /** Ninety minutes from the current half hour, paged forward by [page]. */
+    private fun window() = GuideWindow.at(System.currentTimeMillis(), page)
+
+    private fun paintClock() {
+        ui.clock.text = SimpleDateFormat("h:mm a", Locale.US).format(Date())
     }
 
     private fun openGuide() {
         guideOpen = true
-        val s = slots()
-        ui.slot0.text = hhmm(s[0]); ui.slot1.text = hhmm(s[1]); ui.slot2.text = hhmm(s[2])
-        ui.clock.text = SimpleDateFormat("h:mm a", Locale.US).format(Date())
-        channels.getOrNull(current)?.let { ch ->
-            val p = nowOn(ch)
-            ui.nowPlaying.text = "${ch.number}  ${ch.name}\n" + (p?.title ?: "")
-        }
+        page = 0
+        selRow = current
+        selTime = System.currentTimeMillis()
+        paintClock()
         // Move the video into the corner window, exactly like the original channel.
         ui.fullPlayer.player = null
         ui.windowPlayer.player = player
         ui.guideOverlay.visibility = View.VISIBLE
-        adapter?.notifyDataSetChanged()
-        paintedSlot = slots()[0]
-        focusGuideRow(current)
+        // Rows that fit are only known once the grid has been laid out.
+        ui.guideGrid.post {
+            gridTop = selRow - 1
+            keepCursorOnScreen()
+            paintGrid()
+            paintInfo()
+        }
+        paintGrid()
+        paintInfo()
     }
 
     private fun closeGuide() {
@@ -364,140 +493,69 @@ class MainActivity : AppCompatActivity() {
         ui.fullPlayer.player = player
     }
 
-    inner class GuideAdapter : RecyclerView.Adapter<GuideAdapter.VH>() {
-        inner class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val root: LinearLayout = v.findViewById(R.id.rowRoot)
-            val no: TextView = v.findViewById(R.id.chNo)
-            val name: TextView = v.findViewById(R.id.chName)
-            val cells = listOf<TextView>(
-                v.findViewById(R.id.cell0), v.findViewById(R.id.cell1), v.findViewById(R.id.cell2)
-            )
+    private fun paintGrid() {
+        paintedSlot = GuideWindow.at(System.currentTimeMillis(), 0).a
+        ui.guideGrid.set(channels, guide, window(), gridTop, selRow, selTime, current, theme)
+    }
+
+    /** Scroll by whole rows so the cursor row is on screen. */
+    private fun keepCursorOnScreen() {
+        val n = ui.guideGrid.visibleRows()
+        if (selRow < gridTop) gridTop = selRow
+        if (selRow >= gridTop + n) gridTop = selRow - n + 1
+        gridTop = gridTop.coerceIn(0, maxOf(0, channels.size - n))
+    }
+
+    /** Fill the info panel from the highlighted programme. */
+    private fun paintInfo() {
+        val ch = channels.getOrNull(selRow) ?: return
+        val blk = ui.guideGrid.blockAt(selRow, selTime, window())
+        val at = blk?.let { maxOf(selTime, it.start) } ?: selTime
+        val p = programmeAt(ch, at)
+        ui.infoTitle.text = p?.title ?: blk?.title ?: ch.name
+        ui.infoChannel.text = "${ch.number}   ${ch.name.uppercase(Locale.US)}"
+        val now = System.currentTimeMillis()
+        ui.infoTime.text = when {
+            p == null -> ""
+            now in p.start until p.stop -> "${shortTime(p.start)} – ${shortTime(p.stop)}   ON NOW"
+            else -> SimpleDateFormat("EEE", Locale.US).format(Date(p.start)) +
+                    "  ${shortTime(p.start)} – ${shortTime(p.stop)}"
         }
+        val next = p?.let { cur -> ch.tvgId?.let { guide[it] }?.firstOrNull { it.start >= cur.stop } }
+        ui.infoNext.text = next?.let { "NEXT  ${shortTime(it.start)}   ${it.title}" } ?: ""
+    }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-            VH(LayoutInflater.from(parent.context).inflate(R.layout.row_channel, parent, false))
-
-        override fun getItemCount() = channels.size
-
-        /**
-         * Fill a row's three half-hour cells, merging any that hold the same
-         * programme.
-         *
-         * Each column used to ask independently what was on at that half hour,
-         * so a two hour film answered for all three and read as three separate
-         * half hour programmes. Merging keeps the columns on clean half hours -
-         * the grid stays scannable, and most of a lineup is short enough to
-         * occupy a single column anyway - while making length visible from the
-         * width of the block.
-         */
-        private fun paintCells(h: VH, progs: List<Programme>, s: List<Long>) {
-            val found = (0..2).map { progs.fromSlot(s[it], s[it + 1]) }
-            var i = 0
-            while (i <= 2) {
-                val p = found[i]
-                var span = 1
-                while (i + span <= 2) {
-                    val q = found[i + span]
-                    if (p == null || q == null || q.start != p.start) break
-                    span++
-                }
-                val cell = h.cells[i]
-                cell.visibility = View.VISIBLE
-                // A GONE view is left out of the weight sum, so the merged
-                // cell simply takes the share of every column it covers.
-                cell.layoutParams = (cell.layoutParams as LinearLayout.LayoutParams)
-                    .apply { weight = CELL_WEIGHT * span }
-                cell.text = p?.title ?: "—"
-                for (k in i + 1 until i + span) h.cells[k].visibility = View.GONE
-                i += span
-            }
-        }
-
-        override fun onBindViewHolder(h: VH, position: Int) {
-            val ch = channels[position]
-            val s = slots()
-            h.no.text = ch.number
-            h.name.text = ch.name
-            paintCells(h, ch.tvgId?.let { guide[it] } ?: emptyList(), s)
-            h.name.setTextColor(
-                ContextCompat.getColor(
-                    this@MainActivity,
-                    if (position == current) R.color.guide_cyan else R.color.guide_white
-                )
-            )
-            h.root.setOnClickListener { tune(position); closeGuide() }
-            // Rows are recycled, so repaint from the holder's live position
-            // rather than the position captured when this listener was made.
-            h.root.setOnFocusChangeListener { v, has ->
-                paintRow(v, h.bindingAdapterPosition, has)
-            }
-            paintRow(h.root, position, h.root.hasFocus())
-        }
+    /** Up and down: another channel, same moment. Wraps at the ends. */
+    private fun moveRow(delta: Int) {
+        if (channels.isEmpty()) return
+        selRow = (selRow + delta + channels.size) % channels.size
+        keepCursorOnScreen()
+        paintGrid(); paintInfo()
     }
 
     /**
-     * Colour one guide row.
-     *
-     * Losing focus previously left the row painted as selected, so scrolling
-     * down the guide dragged a trail of highlighted rows behind it. Focus is
-     * the only thing that draws the bright background now; the tuned channel
-     * keeps a dimmer tint of its own plus the cyan name.
+     * Left and right: the previous or next programme on this row, paging the
+     * grid half an hour when the cursor runs off either end.
      */
-    private fun paintRow(row: View, position: Int, focused: Boolean) {
-        row.alpha = if (focused) 1f else 0.82f
-        row.setBackgroundColor(
-            ContextCompat.getColor(
-                this, when {
-                    focused -> R.color.guide_sel
-                    position == current -> R.color.guide_onair
-                    position % 2 == 0 -> R.color.guide_row_a
-                    else -> R.color.guide_row_b
-                }
-            )
-        )
-    }
-
-    /**
-     * Wrap the guide cursor around at the ends of the list.
-     *
-     * Note this has to decide for itself whether we are at an edge. The
-     * activity sees DPAD keys *before* the framework runs its focus search, so
-     * consuming them unconditionally would replace normal row-to-row movement
-     * rather than extending it. Returning false leaves the press to the
-     * framework, which is the common case.
-     */
-    private fun wrapGuideFocus(delta: Int): Boolean {
-        val count = channels.size
-        if (count == 0) return false
-        val focused = ui.guideList.focusedChild
-        val pos = focused?.let { ui.guideList.getChildAdapterPosition(it) }
-            ?: RecyclerView.NO_POSITION
-        if (pos == RecyclerView.NO_POSITION) {
-            // Nothing focused: recover to the channel being watched instead of
-            // leaving the d-pad dead.
-            focusGuideRow(current)
-            return true
+    private fun moveTime(delta: Int) {
+        val win = window()
+        val bs = ui.guideGrid.blocksFor(selRow, win)
+        val cur = ui.guideGrid.blockAt(selRow, selTime, win)
+        val i = bs.indexOf(cur)
+        if (delta < 0) {
+            if (i > 0) selTime = bs[i - 1].start
+            else if (page > 0) { page--; selTime = win.a - 1 }
+            else return
+        } else {
+            if (i in 0 until bs.size - 1) selTime = bs[i + 1].start
+            else if (page < MAX_PAGES) { page++; selTime = maxOf(cur?.stop ?: win.b, window().a) }
+            else return
         }
-        val atEdge = if (delta > 0) pos == count - 1 else pos == 0
-        if (!atEdge) return false
-        focusGuideRow(if (delta > 0) 0 else count - 1)
-        return true
-    }
-
-    /** Scroll a row into view and put the cursor on it once it exists. */
-    private fun focusGuideRow(position: Int) {
-        val lm = ui.guideList.layoutManager as LinearLayoutManager
-        lm.scrollToPositionWithOffset(position, 0)
-        // The holder is only created after the scroll's layout pass, and on a
-        // long jump not always by the first one.
-        ui.guideList.post {
-            val hit = ui.guideList.findViewHolderForAdapterPosition(position)
-            if (hit != null) hit.itemView.requestFocus()
-            else ui.guideList.post {
-                ui.guideList.findViewHolderForAdapterPosition(position)
-                    ?.itemView?.requestFocus()
-            }
+        // Paging back lands on the last block; keep the cursor time inside it.
+        ui.guideGrid.blockAt(selRow, selTime, window())?.let { b ->
+            if (selTime < b.start || selTime >= b.stop) selTime = b.start
         }
+        paintGrid(); paintInfo()
     }
 
     // ---------------------------------------------------------------- remote
@@ -526,7 +584,11 @@ class MainActivity : AppCompatActivity() {
                     settingsCursor = (settingsCursor + 1) % settingsRows.size
                     paintSettings()
                 }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> chooseSetting()
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (settingsCursor == 0) cycleTheme(-1)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> if (settingsCursor == 0) cycleTheme(1)
+                // Repeats are the tail of the hold that opened settings.
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER ->
+                    if (event.repeatCount == 0 && !okHeld) chooseSetting()
                 KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_SETTINGS,
                 KeyEvent.KEYCODE_PROG_RED -> closeSettings()
             }
@@ -535,33 +597,75 @@ class MainActivity : AppCompatActivity() {
 
         if (guideOpen) {
             when (keyCode) {
-                KeyEvent.KEYCODE_BACK -> { closeGuide(); return true }
-                KeyEvent.KEYCODE_MENU -> { closeGuide(); openSettings(); return true }
-                // Only reached at the ends of the list - see wrapGuideFocus.
-                KeyEvent.KEYCODE_DPAD_DOWN -> return wrapGuideFocus(1)
-                KeyEvent.KEYCODE_DPAD_UP -> return wrapGuideFocus(-1)
-                // Settings from inside the guide, where there is room to advertise it.
-                KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_PROG_RED -> {
-                    closeGuide(); openSettings(); return true
-                }
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_GUIDE -> closeGuide()
+                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS,
+                KeyEvent.KEYCODE_PROG_RED -> { closeGuide(); openSettings() }
+                KeyEvent.KEYCODE_DPAD_UP -> moveRow(-1)
+                KeyEvent.KEYCODE_DPAD_DOWN -> moveRow(1)
+                KeyEvent.KEYCODE_CHANNEL_UP -> moveRow(-ui.guideGrid.visibleRows())
+                KeyEvent.KEYCODE_CHANNEL_DOWN -> moveRow(ui.guideGrid.visibleRows())
+                KeyEvent.KEYCODE_DPAD_LEFT -> moveTime(-1)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> moveTime(1)
+                // Acted on when released - see onKeyUp - so a hold can mean settings.
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> trackOk(event)
+                else -> return super.onKeyDown(keyCode, event)
             }
-            return super.onKeyDown(keyCode, event)
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            trackOk(event); return true
         }
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { tune(current - 1); return true }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { tune(current + 1); return true }
-            // BACK opens the channel list, the way a cable box's guide button does.
+            // BACK opens the guide, the way a cable box's guide button does.
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_GUIDE -> { openGuide(); return true }
             // MENU, not SETTINGS: Google TV swallows KEYCODE_SETTINGS for its
             // own panel, so the app never sees it.
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS,
             KeyEvent.KEYCODE_PROG_RED -> { openSettings(); return true }
-            // OK is channel info, not the guide.
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_INFO -> {
-                channels.getOrNull(current)?.let { showBanner(it) }; return true
-            }
+            KeyEvent.KEYCODE_INFO -> { channels.getOrNull(current)?.let { showBanner(it) }; return true }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    /**
+     * OK does double duty, because the Google TV remote has no menu button:
+     * a press does the usual thing, a hold opens SETTINGS. So the press is
+     * only acted on when it is released, and only if it was not held.
+     */
+    private var okHeld = false
+
+    private fun trackOk(event: KeyEvent) {
+        if (event.repeatCount == 0) { okHeld = false; event.startTracking() }
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER) {
+            return super.onKeyLongPress(keyCode, event)
+        }
+        okHeld = true
+        if (!settingsOpen) {
+            if (guideOpen) closeGuide()
+            openSettings()
+        }
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER) {
+            return super.onKeyUp(keyCode, event)
+        }
+        if (okHeld) { okHeld = false; return true }
+        if (!event.isTracking || event.isCanceled || settingsOpen || awaitingSetup) return true
+        if (guideOpen) {
+            if (selRow != current) tune(selRow)
+            closeGuide()
+        } else {
+            // OK is channel info, not the guide.
+            channels.getOrNull(current)?.let { showBanner(it) }
+        }
+        return true
     }
 
     override fun onBackPressed() {
@@ -613,7 +717,7 @@ class MainActivity : AppCompatActivity() {
                         ?.takeIf { it >= 0 }
                         ?.let { current = it }
                     reportLineupChange(ch)
-                    adapter?.notifyDataSetChanged()
+                    if (guideOpen) { paintGrid(); paintInfo() }
                 }
                 startStream()
             }.onFailure {

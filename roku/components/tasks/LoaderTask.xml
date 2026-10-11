@@ -2,6 +2,8 @@
 <component name="LoaderTask" extends="Task">
     <interface>
         <field id="host" type="string" />
+        <!-- "channels" or "guide" -->
+        <field id="mode" type="string" value="channels" />
         <field id="result" type="assocarray" />
     </interface>
     <script type="text/brightscript" uri="pkg:/components/tasks/LoaderTask.brs" />
