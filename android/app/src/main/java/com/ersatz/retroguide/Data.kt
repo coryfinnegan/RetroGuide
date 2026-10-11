@@ -92,14 +92,39 @@ object Source {
         return out.sortedBy { it.number.toFloatOrNull() ?: Float.MAX_VALUE }
     }
 
-    // XMLTV times look like "20260810143000 -0500"
-    private fun parseTime(s: String): Long {
-        val trimmed = s.trim()
-        val base = trimmed.take(14)
-        val fmt = SimpleDateFormat("yyyyMMddHHmmss", Locale.US)
-        val tz = trimmed.drop(14).trim()
-        fmt.timeZone = if (tz.length >= 5) TimeZone.getTimeZone("GMT$tz") else TimeZone.getDefault()
-        return try { fmt.parse(base)?.time ?: 0L } catch (e: Exception) { 0L }
+    /**
+     * XMLTV times look like "20260810143000 -0500".
+     *
+     * Read by hand. This used to build a SimpleDateFormat and look up a
+     * TimeZone for every attribute - two per programme - and once the guide
+     * grew to 7 MB that alone kept the TV on TUNING for half a minute.
+     */
+    internal fun parseTime(s: String): Long {
+        val t = s.trim()
+        if (t.length < 14 || !t.take(14).all { it.isDigit() }) return 0L
+        fun n(from: Int, len: Int) = t.substring(from, from + len).toInt()
+        val local = daysFromCivil(n(0, 4), n(4, 2), n(6, 2)) * 86_400_000L +
+                n(8, 2) * 3_600_000L + n(10, 2) * 60_000L + n(12, 2) * 1000L
+        val tz = t.drop(14).trim()
+        val offset = if (tz.length >= 5 && (tz[0] == '+' || tz[0] == '-') &&
+            tz.substring(1, 5).all { it.isDigit() }) {
+            val mins = tz.substring(1, 3).toInt() * 60 + tz.substring(3, 5).toInt()
+            (if (tz[0] == '-') -mins else mins) * 60_000L
+        } else {
+            TimeZone.getDefault().getOffset(local).toLong()
+        }
+        return local - offset
+    }
+
+    /** Days since 1970-01-01 for a Gregorian date (Howard Hinnant's days_from_civil). */
+    private fun daysFromCivil(year: Int, month: Int, day: Int): Long {
+        val y = (if (month <= 2) year - 1 else year).toLong()
+        val era = (if (y >= 0) y else y - 399) / 400
+        val yoe = y - era * 400
+        val mp = (month + 9) % 12
+        val doy = (153 * mp + 2) / 5 + day - 1
+        val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        return era * 146_097 + doe - 719_468
     }
 
     /**
@@ -129,7 +154,7 @@ object Source {
         val byChannel = HashMap<String, MutableList<Programme>>()
         try {
             val parser = android.util.Xml.newPullParser()
-            parser.setInput(c.inputStream, null)
+            parser.setInput(c.inputStream.buffered(64 * 1024), "UTF-8")
             var start = 0L
             var stop = 0L
             var channel: String? = null
@@ -172,8 +197,5 @@ object Source {
 
 /** What is on a channel at a given moment, and what follows it. */
 fun List<Programme>.at(t: Long): Programme? = firstOrNull { t >= it.start && t < it.stop }
-
-fun List<Programme>.fromSlot(slotStart: Long, slotEnd: Long): Programme? =
-    firstOrNull { it.start < slotEnd && it.stop > slotStart }
 
 fun hhmm(t: Long): String = SimpleDateFormat("h:mm", Locale.US).format(Date(t))

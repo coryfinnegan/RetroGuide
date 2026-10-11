@@ -16,6 +16,7 @@ object Prefs {
     private const val KEY_HOST = "host"
     private const val KEY_LAST_CHANNEL = "last_channel"
     private const val KEY_LINEUP_SIG = "lineup_sig"
+    private const val KEY_THEME = "theme"
 
     private fun sp(c: Context): SharedPreferences =
         c.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -35,6 +36,13 @@ object Prefs {
 
     fun setLastChannel(c: Context, number: String) {
         sp(c).edit().putString(KEY_LAST_CHANNEL, number).apply()
+    }
+
+    /** The guide's look, as a [GuideTheme] key. */
+    fun theme(c: Context): String? = sp(c).getString(KEY_THEME, null)
+
+    fun setTheme(c: Context, key: String) {
+        sp(c).edit().putString(KEY_THEME, key).apply()
     }
 
     /**
