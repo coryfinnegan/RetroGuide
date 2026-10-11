@@ -1,0 +1,4 @@
+# Every file in the repository is owned by @coryfinnegan, so GitHub requests
+# their review on every pull request. With "Require review from Code Owners"
+# on in branch protection, their approval is needed to merge.
+* @coryfinnegan
