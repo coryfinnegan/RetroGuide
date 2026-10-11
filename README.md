@@ -8,7 +8,7 @@ A TV player for [ErsatzTV](https://ersatztv.org), styled after the 1990s TV
 Guide channel: an info panel beside the picture, a clock, and a grid of
 channels in flat, embossed boxes.
 
-Two apps, one design, one server.
+Three builds, one design, one server.
 
 | | | |
 |---|---|---|
@@ -20,6 +20,25 @@ Each folder builds and installs independently — see the README inside it. The
 CRT build is self-hosted rather than installed: `python crt/serve.py --open` on
 the machine wired to the tube. Its look is borrowed from
 [240-MP](https://github.com/anthonycaccese/240-MP).
+
+## Screenshots
+
+The guide on each build, one per theme. Picture windows show colour bars here
+in place of the broadcast.
+
+**Google TV - Halloween**
+
+![The guide on Google TV in the Halloween theme: purple plates, a slime-green highlighted programme, and pumpkins on the hint bar](docs/screenshots/android-halloween.jpg)
+
+**Roku - Retro 90s**
+
+![The guide on a Roku TV in the Retro 90s theme: navy Prevue-style plates with a yellow highlighted programme](docs/screenshots/roku-retro.jpg)
+
+**CRT - Classic**
+
+![The guide on the CRT page in the Classic theme, laid out 4:3 for a tube](docs/screenshots/crt-classic.jpg)
+
+Themes are switched in each build's settings - see [THEMES.md](THEMES.md).
 
 ## Shared behaviour
 
