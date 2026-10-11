@@ -1,0 +1,53 @@
+# CRT page: syntax-checks the JavaScript and Python, then builds the Docker
+# image (without publishing it - that is crt-image.yml) and runs it, checking
+# the server actually hands out the page and everything it loads.
+name: crt
+
+on:
+  pull_request:
+    paths: ["crt/**", ".claude/skills/retroguide-crt/**", ".github/workflows/crt.yml"]
+  push:
+    branches: [main]
+    paths: ["crt/**", ".claude/skills/retroguide-crt/**", ".github/workflows/crt.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: crt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check app.js syntax
+        run: node --check crt/static/app.js
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Compile only: tray.py and kiosk.py drive Windows through ctypes and
+      # cannot be imported on Linux, but a syntax error in them is still caught.
+      - name: Check Python syntax
+        run: python -m py_compile crt/serve.py crt/tools/*.py .claude/skills/retroguide-crt/scripts/*.py
+
+      - name: Build image
+        run: docker build -t retroguide-crt:ci crt
+
+      - name: Serve and fetch the page
+        run: |
+          docker run -d --rm --name crt -p 8464:8464 retroguide-crt:ci
+          for i in $(seq 1 20); do curl -fs http://localhost:8464/ >/dev/null && break; sleep 1; done
+          # The page, and every script and stylesheet it references.
+          for path in / /app.js /style.css /themes.css /vendor/hls.min.js; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8464$path")
+            echo "$path -> $code"
+            test "$code" = 200
+          done
+          docker stop crt

@@ -1,0 +1,48 @@
+# Roku build: validates the BrightScript and SceneGraph XML, then packages the
+# sideload zip and keeps it as an artifact.
+#
+# There is no Roku compiler for Linux, so BrighterScript stands in for it. It
+# catches the class of mistake that otherwise only shows up on the device's
+# console as an app that never starts - a reserved word used as a name ("pos",
+# "to", "run"), a syntax error, an unknown function.
+name: roku
+
+on:
+  pull_request:
+    paths: ["roku/**", ".github/workflows/roku.yml"]
+  push:
+    branches: [main]
+    paths: ["roku/**", ".github/workflows/roku.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: roku-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Pinned, so a new BrighterScript release cannot turn a green build red.
+      - name: Validate BrightScript
+        working-directory: roku
+        run: npx -y brighterscript@0.69.8 --root-dir . --create-package false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Package sideload zip
+        run: python roku/tools/package.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retroguide-roku-zip
+          path: roku/out/retroguide.zip
+          retention-days: 14
