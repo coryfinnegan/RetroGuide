@@ -160,7 +160,10 @@ so, which is an ErsatzTV setting rather than anything here.
 | ↑ / ↓ | Change channel — in the guide, move the highlight |
 | Number keys | Tune directly (a PC has the keypad a TV remote doesn't) |
 | Enter / G | Open the guide — in the guide, watch the highlighted channel |
-| Esc | Close the guide |
+| Esc | Close the guide — while watching, open settings |
+| ← / → | In the guide, move through time a half hour at a time |
+| M | Settings — theme, picture, screen, overscan, server |
+| T | Next theme ([THEMES.md](../THEMES.md)); `?theme=` pins one |
 | I | Show the channel banner |
 | A | Picture size — FILL / FIT / STRETCH |
 | S | Screen — stretch to fill the raster, or letterbox |

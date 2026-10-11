@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Retro Guide</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="themes.css">
 
 <div id="stage">
   <video id="video" playsinline></video>
@@ -23,13 +24,40 @@
       <div id="osdSub"></div>
     </div>
 
+    <!-- The guide, laid out after the two cable guides the design was taken
+         from: an info panel and the picture across the top, a grid with one
+         highlighted cell, and a key-hint bar. Every surface is a flat,
+         embossed plate, as on the Prevue Channel grid of 1993-99. The picture
+         is #video itself, shrunk into the window #pipFrame outlines. -->
     <div id="guide" class="hidden">
+      <div id="guideTop">
+        <div id="panel" class="plate">
+          <div id="panelHead">
+            <span id="guideLogo"></span>
+            <span id="logoA"></span><span id="logoB"></span>
+            <span id="guideClock"></span>
+          </div>
+          <div id="infoTitle"></div>
+          <div id="infoTime"></div>
+          <div id="infoChannel"></div>
+          <div id="infoNext"></div>
+        </div>
+        <div id="pipFrame"></div>
+      </div>
       <div id="guideHead">
-        <span id="guideTitle">CHANNEL</span>
-        <span id="slot0"></span><span id="slot1"></span><span id="slot2"></span>
+        <span id="guideDate" class="plate"></span>
+        <div id="times" class="plate"></div>
       </div>
       <div id="rows"></div>
-      <div id="guideFoot"></div>
+      <div id="guideFoot" class="plate"></div>
+      <!-- Theme decoration; each theme decides what, if anything, goes here. -->
+      <div id="deco"><i class="d1"></i><i class="d2"></i><i class="d3"></i><i class="d4"></i><i class="d5"></i><i class="d6"></i></div>
+    </div>
+
+    <div id="settings" class="hidden">
+      <h1>SETTINGS</h1>
+      <ul id="settingsList"></ul>
+      <p class="hint">&#9650;&#9660; CHOOSE &nbsp; &#9664;&#9654; CHANGE &nbsp; ENTER SELECT &nbsp; ESC BACK</p>
     </div>
 
     <div id="setup">

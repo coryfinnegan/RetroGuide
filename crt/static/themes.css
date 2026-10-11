@@ -1,0 +1,92 @@
+/* Guide themes. Picked in SETTINGS (M), remembered, and pinnable with
+ * ?theme=. Each one restates the palette from style.css - the same palettes
+ * as GuideTheme.kt on Android and themeFor() on Roku - and may add art in
+ * #deco and #guideLogo. Logo words are set by app.js.
+ *
+ * Artwork is sourced, not drawn - see THEMES.md at the repo root. The CRT rules
+ * still apply: nothing thinner than 2px, nothing small, flat colour.
+ */
+
+@font-face { font-family: "Star4000"; src: url("themes/fonts/Star4000.woff") format("woff"); }
+@font-face { font-family: "Star4000 Large"; src: url("themes/fonts/Star4000-Large.woff") format("woff"); }
+
+/* ------------------------------------------------------------ RETRO 90s
+   The Prevue Channel, 1993-99, colours sampled from a broadcast capture:
+   navy plates with near-white bevels, white titles, the number in white over
+   a yellow call sign, yellow times on a lighter blue time bar. WeatherSTAR
+   typeface on the logo and clock. */
+#stage.theme-retro {
+  --t-bg:       #000;
+  --t-panel:    #323278;
+  --t-rule:     #f2dc4a;
+  --t-title:    #fff;
+  --t-info:     #dcdcf5;
+  --t-accent:   #f2dc4a;
+  --t-clock:    #fff;
+  --t-logo-a:   #fff;
+  --t-logo-b:   #f2dc4a;
+  --t-frame:    #dcdcf5;
+  --t-head:     #5a6ec8;
+  --t-head-ink: #f2dc4a;
+  --t-chan:     #323278;
+  --t-num:      #fff;
+  --t-chan-ink: #f2dc4a;
+  --t-tuned:    #7fe0ff;
+  --t-cell:     #323278;
+  --t-cell-ink: #fff;
+  --t-sel:      #f2dc4a;
+  --t-sel-ink:  #14143c;
+  --t-foot:     #323278;
+  --t-foot-ink: #fff;
+  --t-brand-font: "Star4000 Large", "Star4000", monospace;
+}
+#stage.theme-retro #guideLogo { display: block; background-image: url("themes/retro/tv.svg"); }
+
+/* ------------------------------------------------------------ HALLOWEEN
+   Purple plates, a slime-green cursor and pumpkin-orange lettering, under a
+   jack-o'-lantern logo, a moon with bats, and pumpkins on the hint bar. */
+#stage.theme-halloween {
+  --t-bg:       #0e0418;
+  --t-panel:    #3a1258;
+  --t-rule:     #7cff3a;
+  --t-title:    #fff;
+  --t-info:     #e6d8ff;
+  --t-accent:   #ff9a2e;
+  --t-clock:    #9cff57;
+  --t-logo-a:   #ff8a1c;
+  --t-logo-b:   #9cff57;
+  --t-frame:    #7cff3a;
+  --t-head:     #2a0c42;
+  --t-head-ink: #ff9a2e;
+  --t-chan:     #2a0c42;
+  --t-num:      #ff9a2e;
+  --t-chan-ink: #9cff57;
+  --t-tuned:    #fff;
+  --t-cell:     #54207a;
+  --t-cell-ink: #fff;
+  --t-sel:      #7cff3a;
+  --t-sel-ink:  #12061c;
+  --t-foot:     #2a0c42;
+  --t-foot-ink: #e6d8ff;
+}
+#stage.theme-halloween #guideLogo { display: block; background-image: url("themes/halloween/pumpkin.svg"); }
+
+#stage.theme-halloween #deco { display: block; position: absolute; inset: 0; pointer-events: none; }
+#stage.theme-halloween #deco i { position: absolute; background: center / contain no-repeat; }
+/* the moon, with bats, in the strip between the logo and the clock */
+#stage.theme-halloween #deco .d1 { left: 200px; top: 5px; width: 26px; height: 26px;
+  background-image: url("themes/halloween/moon.svg"); }
+#stage.theme-halloween #deco .d2 { left: 178px; top: 14px; width: 20px; height: 15px;
+  background-image: url("themes/halloween/bat.svg"); animation: flap 1.6s steps(1, end) infinite; }
+#stage.theme-halloween #deco .d3 { left: 232px; top: 6px; width: 16px; height: 12px;
+  background-image: url("themes/halloween/bat.svg"); animation: flap 1.6s steps(1, end) -0.8s infinite; }
+/* pumpkins on the left end of the hint bar, a web on the right */
+#stage.theme-halloween #deco .d4 { left: -6px; bottom: -4px; width: 30px; height: 30px;
+  background-image: url("themes/halloween/pumpkin.svg"); }
+#stage.theme-halloween #deco .d5 { left: 20px; bottom: -2px; width: 24px; height: 24px;
+  background-image: url("themes/halloween/pumpkin.svg"); }
+#stage.theme-halloween #deco .d6 { right: -8px; bottom: -8px; width: 40px; height: 40px;
+  background-image: url("themes/halloween/web.svg"); }
+/* make room for the pumpkins at the left end of the hint bar */
+#stage.theme-halloween #guideFoot { padding-left: 40px; padding-right: 26px; gap: 12px; }
+@keyframes flap { 50% { transform: translateY(-3px) scaleX(0.8); } }
