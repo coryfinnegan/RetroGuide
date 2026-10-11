@@ -3,12 +3,14 @@
 # can be sideloaded without building it locally.
 name: android
 
+# Runs on every pull request and push to main, so the check always
+# reports and can be marked required. The `changes` job decides whether
+# anything under its paths changed; when nothing did, `android` is
+# skipped, which GitHub counts as passing.
 on:
   pull_request:
-    paths: ["android/**", ".github/workflows/android.yml"]
   push:
     branches: [main]
-    paths: ["android/**", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +18,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            changed:
+              - 'android/**'
+              - '.github/workflows/android.yml'
+
+  android:
+    needs: changes
+    if: needs.changes.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
