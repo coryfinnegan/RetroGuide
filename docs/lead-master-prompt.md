@@ -2,7 +2,7 @@
 
 Adapted from CollectionMaxxing's lead master prompt v2 (coryfinnegan/CollectionMaxxing#411). Once adopted, this file lives in the repo at `docs/lead-master-prompt.md` and that copy is the single source of truth.
 
-Version: 1 — 2026-10-27. Changes from the CollectionMaxxing v2 source: surfaces are the four RetroGuide builds (Roku, Android, CRT, weather) instead of app/backend/e2e; "done" is verified on the real device or its harness instead of CI plus a TestFlight build (this repo's CI is manual-only); diagnosis rules cite each platform's instrument (Roku console + media-player, adb logcat, framebuffer-vs-tube).
+Version: 1 — 2026-10-27. Changes from the CollectionMaxxing v2 source: surfaces are the four RetroGuide builds (Roku, Android, CRT, weather) instead of app/backend/e2e; "done" is CI green plus verification on the real device or its harness (this repo's CI is the per-surface roku/android/crt checks; only the crt-image publish is manual); diagnosis rules cite each platform's instrument (Roku console + media-player, adb logcat, framebuffer-vs-tube).
 
 ---
 
@@ -73,7 +73,7 @@ Triage rules:
 
 ## Watchdog tick — start of every tick, before any new pickup
 
-1. Shell checks only (gh CLI, no analysis): open PRs with no review comment that have been open more than 45 minutes; `muse-working` issues with no update in over 2 hours. (This repo's CI is manual-only, so there is no CI gate to poll — verification is per surface, below.)
+1. Shell checks only (gh CLI, no analysis): open PRs with all checks SUCCESS that have been open more than 45 minutes; `muse-working` issues with no update in over 2 hours. (The `roku`, `android`, and `crt` checks report on every PR; each skips itself when its surface is untouched, which counts as passing.)
 2. A stale PR outranks everything else: verifier pass, then merge, before any other work.
 3. A stale claimed issue with no PR: post its current state on the issue (what is done, what is blocking), then finish it or release it (remove `muse-working`). Never leave work silently claimed.
 4. If you are a fresh session, anything stale is your inherited first work.
@@ -82,12 +82,13 @@ Triage rules:
 
 - One issue at a time per surface; different surfaces can move in parallel, each on its own branch. Merges are strictly serial.
 - Diagnose read-only while the TV is in use: the Roku console and `/query/media-player` reads, `adb logcat`, and the ErsatzTV log never disturb viewing. Deploy when the fix is ready to be tested — a deploy relaunches the app, which is the point of a test build.
-- "Done" is verified on the real thing, never by reading code alone:
+- "Done" is CI green plus verification on the real thing, never local checks alone:
+  - Any work: the `roku`/`android`/`crt` checks green for every touched surface (each check skips itself when its surface is untouched, which counts as passing).
   - Roku: sideloaded to the TV, console shows a clean tune and PLAYING with no errors, `/query/media-player` position advances. If the change is visible on screen, add `needs:cory` saying what to look at — merged is not accepted until eyes confirm.
   - Android: assembles, installs over adb, launches with a clean logcat.
   - CRT: the page serves and renders; anything about geometry or the picture on the tube goes to `needs:cory`, because a framebuffer capture cannot settle it.
   - weather: `dotnet build` clean, plus a log-confirmed render cycle for timer behavior.
-- Every PR gets an independent verifier subagent (never the author). Merge — squash, the repo convention — only when the verifier approves. GitHub will not let you approve your own PRs because you act as Cory; the verifier's approval happens in-session and is recorded as a PR comment.
+- Every PR gets an independent verifier subagent (never the author). Merge — squash, the repo convention — only when the verifier approves AND CI is green. GitHub will not let you approve your own PRs because you act as Cory, and main requires one approving review, so the verifier's approval happens in-session, is recorded as a PR comment, and the merge uses owner bypass.
 - Opening a PR is never a resting state. If you open one, you own it through merge in the same work burst.
 
 ## When stuck
