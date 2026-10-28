@@ -34,7 +34,11 @@ sub init()
     m.STALL_SECS = 12
     ' A backward jump bigger than this is the player recovering from a splice
     ' stall by re-playing old segments; resync to the live edge instead.
-    m.JUMPBACK_SECS = 8
+    ' Observed firmware seeks run 5-11 s, so 4 s catches them all while
+    ' staying far above position noise (0.5 s steps). The discontinuity
+    ' filter should prevent these entirely - a resync line now means a
+    ' splice event leaked through the proxy path.
+    m.JUMPBACK_SECS = 4
     m.RESYNC_COOLDOWN_SECS = 30
 
     ' Grid geometry, in 1920x1080 pixels.

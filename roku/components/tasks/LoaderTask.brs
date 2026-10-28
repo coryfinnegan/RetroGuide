@@ -41,7 +41,19 @@ sub load()
         m.top.result = out
         return
     end if
-    out.channels = parseM3U(m3u)
+    ' The discontinuity filter (roku/proxy) runs next to ErsatzTV on the same
+    ' machine. When it answers, channel URLs point at it so item boundaries
+    ' play as ordinary segment joins; when it does not, play direct - the
+    ' proxy is an enhancement, never a requirement.
+    proxyBase = ""
+    candidate = proxyBaseFor(host)
+    if proxyIsUp(candidate) then
+        proxyBase = candidate
+        ? "[rg] hls proxy up, filtering discontinuities"
+    else
+        ? "[rg] hls proxy down, direct playlists"
+    end if
+    out.channels = parseM3U(m3u, proxyBase)
     out.ms = clock.TotalMilliseconds()
     m.top.result = out
 end sub
@@ -57,9 +69,47 @@ function httpGet(url as String) as Dynamic
     return body
 end function
 
+' The proxy lives on the same machine as ErsatzTV, port 8899. host is the
+' server as "address" or "address:port" - the address part carries over.
+function proxyBaseFor(host as String) as String
+    name = host
+    colon = host.Instr(":")
+    if colon > 0 then name = host.Left(colon - 1)
+    return "http://" + name + ":8899"
+end function
+
+' True when the discontinuity filter answers. Async with a short wait so a
+' missing proxy costs one fast refusal (or 2.5 s worst case), never the
+' thirty seconds a sync fetch would block.
+function proxyIsUp(base as String) as Boolean
+    xfer = CreateObject("roUrlTransfer")
+    xfer.SetUrl(base + "/health")
+    xfer.SetRequest("GET")
+    msgPort = CreateObject("roMessagePort")
+    xfer.SetMessagePort(msgPort)
+    if not xfer.AsyncGetToString() then return false
+    msg = msgPort.WaitMessage(2500)
+    xfer.AsyncCancel()
+    if msg = invalid then return false
+    if type(msg) <> "roUrlEvent" then return false
+    return msg.GetResponseCode() = 200
+end function
+
+' The number between "/channel/" and ".ts" in an M3U line, or "" when the
+' line is shaped any other way. Instr/Mid are 1-based; 0 means absent.
+function channelNumberFromTs(line as String) as String
+    marker = "/channel/"
+    at = line.Instr(marker)
+    if at = 0 then return ""
+    rest = line.Mid(at + marker.Len())
+    dot = rest.Instr(".ts")
+    if dot = 0 then return ""
+    return rest.Left(dot - 1)
+end function
+
 ' ---------------------------------------------------------------- M3U
 
-function parseM3U(text as String) as Object
+function parseM3U(text as String, proxyBase as String) as Object
     q = chr(34)
     reId = CreateObject("roRegex", "tvg-id=" + q + "([^" + q + "]*)" + q, "")
     reNo = CreateObject("roRegex", "tvg-chno=" + q + "([^" + q + "]*)" + q, "")
@@ -90,6 +140,10 @@ function parseM3U(text as String) as Object
             ' needs no server side configuration.
             if Right(line, 3) = ".ts" then
                 pending.url = Left(line, line.Len() - 3) + ".m3u8?mode=segmenter"
+                if proxyBase <> "" then
+                    num = channelNumberFromTs(line)
+                    if num <> "" then pending.url = proxyBase + "/hls/" + num + ".m3u8"
+                end if
             else
                 pending.url = line
             end if
