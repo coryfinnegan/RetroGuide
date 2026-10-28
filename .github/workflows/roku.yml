@@ -59,6 +59,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Test HLS discontinuity filter
+        run: python roku/proxy/test_hls_proxy.py
+
       - name: Package sideload zip
         run: python roku/tools/package.py
 

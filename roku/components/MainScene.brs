@@ -32,6 +32,14 @@ sub init()
     ' A stream that reports playing while its position stands still for this
     ' long is dead; see onWatchdog.
     m.STALL_SECS = 12
+    ' A backward jump bigger than this is the player recovering from a splice
+    ' stall by re-playing old segments; resync to the live edge instead.
+    ' Observed firmware seeks run 5-11 s, so 4 s catches them all while
+    ' staying far above position noise (0.5 s steps). The discontinuity
+    ' filter should prevent these entirely - a resync line now means a
+    ' splice event leaked through the proxy path.
+    m.JUMPBACK_SECS = 4
+    m.RESYNC_COOLDOWN_SECS = 30
 
     ' Grid geometry, in 1920x1080 pixels.
     m.GRID_X = 48
@@ -107,6 +115,7 @@ sub init()
     m.lastPos = -1
     m.playClock = CreateObject("roTimespan")
     m.advanceClock = CreateObject("roTimespan")
+    m.lastResyncSec = -1
 
     m.themeKey = readRegistry("theme")
     if m.themeKey = "" then m.themeKey = "classic"
@@ -120,6 +129,7 @@ sub init()
     m.clockTimer = newTimer(30, true, "onClockTimer")
     m.clockTimer.control = "start"
     m.guideTimer = newTimer(m.GUIDE_REFRESH_SECS, true, "onGuideTimer")
+    
     m.firstGuideTimer = newTimer(m.GUIDE_AFTER_PLAY_SECS, false, "onFirstGuideTimer")
     m.watchdog = newTimer(2, true, "onWatchdog")
     m.holdTimer = newTimer(0.8, false, "onHoldTimer")
@@ -315,6 +325,8 @@ sub startStream()
     content = CreateObject("roSGNode", "ContentNode")
     content.url = ch.url
     content.streamformat = "hls"
+    ' A live channel, not VOD - every Roku live player marks it so.
+    content.live = true
     content.title = ch.name
     ? "[rg] tune #"; ch.number; " "; ch.name; " -> "; ch.url
     m.tuneClock = CreateObject("roTimespan")
@@ -381,6 +393,17 @@ sub onWatchdog()
     end if
     vpos = m.video.position
     if vpos <> m.lastPos then
+        if m.lastPos >= 0 and vpos >= 0 then
+            if m.lastPos - vpos > m.JUMPBACK_SECS then
+                now = nowSeconds()
+                if now - m.lastResyncSec >= m.RESYNC_COOLDOWN_SECS then
+                    ? "[rg] watchdog: position jumped back "; m.lastPos; " -> "; vpos; " - resyncing"
+                    m.lastResyncSec = now
+                    startStream()
+                    return
+                end if
+            end if
+        end if
         m.lastPos = vpos
         m.advanceClock.Mark()
         if m.autoRestarts > 0 and m.playClock.TotalSeconds() > 30 then m.autoRestarts = 0
