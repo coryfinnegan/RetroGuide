@@ -244,7 +244,9 @@ the CORS headers a browser needs, so there is no proxy in the way of the video.
 Streams are requested as `?mode=segmenter`: a browser will not play raw
 MPEG-TS, and that is the one form ErsatzTV serves as an ordinary live playlist
 of short segments. Playback is [hls.js](https://github.com/video-dev/hls.js)
-(MIT), vendored under `static/vendor/` so this runs with no network but yours.
+1.6.19 (Apache-2.0), vendored under `static/vendor/` so this runs with no
+network but yours. Keep it at 1.6 or later: 1.5 dropped the audio an octave
+at the first commercial break on desktop Chrome.
 
 The channel list is read at startup and not again — a changed lineup appears at
 the next start, and the banner says so once. Listings are re-read every half

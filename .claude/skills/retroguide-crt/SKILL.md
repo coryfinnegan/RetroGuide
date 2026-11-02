@@ -173,6 +173,24 @@ PC. Do not reach for it again.
   restarts the transcoder inside the same session and playback never breaks. Only
   a genuinely retired session reproduces it, which in practice means restarting
   ErsatzTV. A test that "passes" without the toast appearing has proved nothing.
+- **Audio an octave low from the first commercial on was hls.js 1.5, not the
+  stream.** ErsatzTV's output never changes at a splice (AAC-LC 48 kHz stereo,
+  continuous PTS), but it tags every item boundary `EXT-X-DISCONTINUITY`, so
+  hls.js realigns there and fills the small audio gap with silent frames. On
+  desktop Chrome hls.js 1.5 labelled all AAC-LC as HE-AAC (`mp4a.40.5`, a
+  user-agent hack) and so chose *HE-AAC* silent frames. The first one switched
+  Chrome's decoder into SBR, and a 1 kHz tone read 486 Hz from then on, at
+  normal speed. Android never sees it: ExoPlayer reads the raw `.ts` (the same
+  segments, no tags) and takes the codec from the ADTS headers. hls.js 1.6
+  removed the hack (video-dev/hls.js#6627). Do not vendor anything older.
+
+  **Reproduce it without watching anything:** ffmpeg a few items of `sine` plus
+  `testsrc2`, each run appended to one playlist with
+  `-hls_flags append_list+discont_start` and a running `-output_ts_offset`.
+  That gives the same shape as ErsatzTV: doubled leading tag, 0.04s tail
+  segments, continuous PTS. Play it through the vendored hls.js in headless
+  Chrome (`--headless=new --mute-audio`), route the `<video>` into an
+  AnalyserNode, and log the peak frequency against `currentTime`.
 - **A fresh kiosk profile has nothing in localStorage**, so it stops at the setup
   screen with no keyboard attached and no saved geometry. `kiosk.py` pins both
   `?host=` and `?screen=` in the URL for that reason. Keep new settings pinnable.
