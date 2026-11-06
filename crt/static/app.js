@@ -255,6 +255,11 @@ function startStream() {
   lastAdvance = Date.now();
   if (hls) { hls.destroy(); hls = null; }
   if (window.Hls && Hls.isSupported()) {
+    // Needs hls.js 1.6 or later. 1.5 labelled every AAC-LC stream HE-AAC on
+    // desktop Chrome and patched audio gaps with HE-AAC silence. ErsatzTV
+    // marks a discontinuity at every programme and commercial, hls.js fills
+    // the small gap there, and the first such frame switched the decoder into
+    // SBR: everything after it played an octave low until the next retune.
     hls = new Hls({ liveDurationInfinity: true, enableWorker: true });
     hls.loadSource(ch.url);
     hls.attachMedia(video);
